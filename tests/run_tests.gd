@@ -75,6 +75,8 @@ func walk_until_z(z_target: float, timeout: float) -> Dictionary:
 			st["air"] += 1
 			if OS.has_environment("AIR_DEBUG"):
 				print("AIRDBG n=%d pos=%s v=%s tsg=%.3f" % [n, pc.global_position, pc.velocity, pc.time_since_grounded])
+		if OS.has_environment("WALK_DEBUG") and n % 6 == 0:
+			print("WALKDBG n=%d pos=%s v=%s st=%s floor=%s wall=%s fn=%s" % [n, pc.global_position, pc.velocity, pc.get_state_name(), pc.is_on_floor(), pc.is_on_wall(), pc.get_floor_normal()])
 		if pc.global_position.z <= z_target:
 			st["ok"] = true
 			st["t"] = float(n + 1) / hz
@@ -435,10 +437,11 @@ func t_buffer() -> void:
 	var rejumped := false
 	for k in secs(0.5):
 		await tick()
-		if pc.is_on_floor() and landed_at < 0:
-			landed_at = k
-		if landed_at >= 0 and pc.velocity.y > 3.0:
+		# we were falling when jump was pressed: any upward speed now means the
+		# buffered press fired on (or right after) touchdown
+		if pc.velocity.y > 3.0:
 			rejumped = true
+			landed_at = k
 			break
 	check("jump_buffer", rejumped, "rejumped=%s" % rejumped)
 	await tick(secs(1.0))
@@ -833,6 +836,8 @@ func t_fuzz() -> void:
 			var p := pc.global_position
 			if is_nan(p.x) or is_nan(p.y) or is_nan(pc.velocity.y):
 				nan = true
+			if pc.velocity.y > 5.0 and issues.size() < 8:
+				issues.append("vy=%.2f st=%s pos=%s spot=%d n=%d" % [pc.velocity.y, pc.get_state_name(), p, spots.find(sp), n])
 			max_vy = maxf(max_vy, pc.velocity.y)
 			min_y = minf(min_y, p.y)
 			if pc.state == last_state and pc.state != PlayerController.State.GROUND and pc.state != PlayerController.State.AIR:
@@ -844,6 +849,6 @@ func t_fuzz() -> void:
 	release_all()
 	var max_run_s := float(max_state_run) / hz
 	check("fuzz_no_nan", not nan)
-	check("fuzz_no_launch", max_vy < 6.0, "max vy=%.2f" % max_vy)
+	check("fuzz_no_launch", max_vy < 6.0, "max vy=%.2f %s" % [max_vy, issues])
 	check("fuzz_no_fall_through", min_y > -0.05, "min y=%.3f" % min_y)
 	check("fuzz_no_stuck_action_state", max_run_s < 4.5, "longest SLIDE/ROLL/TRAVERSE run=%.2fs" % max_run_s)

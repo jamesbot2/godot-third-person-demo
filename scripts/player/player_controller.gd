@@ -96,6 +96,11 @@ const STATE_NAMES := ["GROUND", "AIR", "SLIDE", "ROLL", "TRAVERSE"]
 ## Free tread depth required above a step (m).
 @export var step_min_depth := 0.12
 @export_range(0.0, 89.0) var max_slope_deg := 45.0
+## Extra tolerance on the physics floor test. Contacts on a slope's toe edge
+## report a blended normal a few degrees steeper than the face (measured
+## 44-46 deg on a 40 deg ramp at 120 Hz), which stalled the player at the foot
+## of walkable ramps. Uphill speed scaling still uses max_slope_deg.
+@export_range(0.0, 10.0) var slope_contact_tolerance_deg := 3.0
 
 @export_group("Slide")
 @export var slide_min_speed := 5.0
@@ -194,7 +199,7 @@ func _ready() -> void:
 	_collider.shape = _shape
 	_shape.radius = body_radius
 	_set_collider_height(stand_height)
-	floor_max_angle = deg_to_rad(max_slope_deg)
+	floor_max_angle = deg_to_rad(max_slope_deg + slope_contact_tolerance_deg)
 	floor_snap_length = max_step_height + 0.05
 	floor_constant_speed = true
 	floor_stop_on_slope = true
@@ -462,7 +467,7 @@ func _target_speed() -> float:
 		if slope > 0.02:
 			var downhill := Vector3(n.x, 0, n.z).normalized()
 			var uphill_amount := clampf(-wish_dir.dot(downhill), 0.0, 1.0)
-			var steep := clampf(slope / floor_max_angle, 0.0, 1.0)
+			var steep := clampf(slope / deg_to_rad(max_slope_deg), 0.0, 1.0)
 			s *= lerpf(1.0, uphill_speed_factor, steep * uphill_amount)
 	if landing_recovery > 0.0:
 		s *= landing_speed_scale
@@ -754,7 +759,7 @@ func _try_traverse(in_air: bool) -> bool:
 			params.motion = over
 			if not PhysicsServer3D.body_test_motion(rid, params, res):
 				_start_traverse(Traverse.VAULT, [p1, raised.origin + over], wall_dir,
-					maxf(hv.length() * 0.9, vault_exit_speed), 0.36 + 0.1 * h + approach / maxf(hv.length(), 2.0))
+					maxf(hv.length() * 0.9, vault_exit_speed), 0.40 + 0.12 * h + approach / maxf(hv.length(), 2.0))
 				return true
 	# Mantle: stand on top.
 	var target := Vector3(feet.x, top_y + 0.06, feet.z) + wall_dir * (wall_dist + body_radius + 0.15)
@@ -762,7 +767,7 @@ func _try_traverse(in_air: bool) -> bool:
 	params.motion = target - raised.origin
 	if PhysicsServer3D.body_test_motion(rid, params, res):
 		return false
-	_start_traverse(Traverse.MANTLE, [p1, target], wall_dir, mantle_exit_speed, 0.3 + 0.22 * h + approach / maxf(hv.length(), 2.0))
+	_start_traverse(Traverse.MANTLE, [p1, target], wall_dir, mantle_exit_speed, 0.35 + 0.25 * h + approach / maxf(hv.length(), 2.0))
 	return true
 
 
@@ -782,14 +787,16 @@ func _start_traverse(kind: int, pts: Array, dir: Vector3, exit_speed: float, dur
 func _tick_traverse(dt: float) -> void:
 	_tr_time += dt
 	var u := clampf(_tr_time / _tr_duration, 0.0, 1.0)
-	var rise_frac := 0.55   # phase 1: rise (ease-out) while closing on the wall face
+	var rise_frac := 0.55   # phase 1: rise while closing on the wall face
 	var p: Vector3
 	if u < rise_frac:
 		var a := u / rise_frac
-		# ease-out height >= linear approach -> the feet clear the top edge
-		# before reaching the face.
-		var y := lerpf(_tr_points[0].y, _tr_points[1].y, 1.0 - pow(1.0 - a, 2.0))
-		var xz := _tr_points[0].lerp(_tr_points[1], a)
+		# Height: smoothstep (starts and ends with zero vertical speed, peak
+		# 1.5*h/t_rise, no instant upward pop). Approach: ease-in a^2, which
+		# stays below the smoothstep, so the feet are above the top edge
+		# (relatively) before the body reaches the wall face.
+		var y := lerpf(_tr_points[0].y, _tr_points[1].y, a * a * (3.0 - 2.0 * a))
+		var xz := _tr_points[0].lerp(_tr_points[1], a * a)
 		p = Vector3(xz.x, y, xz.z)
 	else:
 		var b := (u - rise_frac) / (1.0 - rise_frac)
