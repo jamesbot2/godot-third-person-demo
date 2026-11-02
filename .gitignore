@@ -1,0 +1,15 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+*.translation
+export.cfg
+export_credentials.cfg
+.import/
+*.import.bak
+# Engine binaries (download separately)
+Godot_v*
+*.zip
+# OS / editor
+.DS_Store
+Thumbs.db
+*.tmp
