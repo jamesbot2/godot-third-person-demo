@@ -10,6 +10,8 @@ METRIC|sprint_t95_s|0.4500
 RESULT|PASS|sprint_buildup|t95=0.450s
 METRIC|sprint_stop_dist_m|0.8900
 RESULT|PASS|brake_dist_sprint|d=0.890
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 METRIC|sprint_exit_speed_0.1s|5.6000
 RESULT|PASS|sprint_exit_gradual|v@0.1s=5.60 v@0.5s=4.20
 METRIC|reverse_t90_s|0.3000
@@ -35,8 +37,6 @@ RESULT|PASS|stairs_down_grounded|y=0.001 ungrounded_ticks=0
 RESULT|PASS|steep_stairs_0.25|reached=true y=2.001 t=1.18s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_up_10|angle=10 reached=true y=1.501 t=2.88s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_down_10|y=0.001 ungrounded_ticks=0
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|ramp_up_20|angle=20 reached=true y=1.501 t=1.88s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_down_20|y=0.001 ungrounded_ticks=0
 RESULT|PASS|ramp_up_30|angle=30 reached=true y=1.501 t=1.57s max_vy=0.00 air_ticks=0

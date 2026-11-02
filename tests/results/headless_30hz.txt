@@ -21,8 +21,6 @@ RESULT|PASS|no_instant_turn|max turn rate 885 deg/s
 RESULT|PASS|step_up_0.15|h=0.15 reached=true y_on_top=0.151 max_y=0.151 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.25|h=0.25 reached=true y_on_top=0.251 max_y=0.251 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.35|h=0.35 reached=true y_on_top=0.351 max_y=0.351 max_vy=0.00 air_ticks=0 t=0.93s
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.401 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_block_0.50|h=0.50 reached=false y_on_top=0.001 max_y=0.001 max_vy=0.00 air_ticks=0 t=-1.00s
 RESULT|PASS|step_down_0.15|y=0.001 air_ticks=0
@@ -82,6 +80,8 @@ RESULT|PASS|vault_0.9|saw=true z=-9.76 y=0.001 max_y=0.96 state=GROUND
 RESULT|PASS|vault_sprint|v_in=6.80 saw=true z=-9.81 max_y=0.96
 RESULT|PASS|vault_needs_input|z=-5.60 state=GROUND
 RESULT|PASS|mantle_1.5|saw=true y=1.501 max_y=1.560 state=GROUND
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|mantle_air_catch|saw=true y=1.501 state=GROUND
 RESULT|PASS|tall_wall_rejected|traversed=false y=0.001
 RESULT|PASS|landing_2m|impact=8.70 m/s severity=1 expect=1

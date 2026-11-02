@@ -73,10 +73,6 @@ func walk_until_z(z_target: float, timeout: float) -> Dictionary:
 		st["max_vy"] = maxf(st["max_vy"], pc.velocity.y)
 		if pc.state == PlayerController.State.AIR:
 			st["air"] += 1
-			if OS.has_environment("AIR_DEBUG"):
-				print("AIRDBG n=%d pos=%s v=%s tsg=%.3f" % [n, pc.global_position, pc.velocity, pc.time_since_grounded])
-		if OS.has_environment("WALK_DEBUG") and n % 6 == 0:
-			print("WALKDBG n=%d pos=%s v=%s st=%s floor=%s wall=%s fn=%s" % [n, pc.global_position, pc.velocity, pc.get_state_name(), pc.is_on_floor(), pc.is_on_wall(), pc.get_floor_normal()])
 		if pc.global_position.z <= z_target:
 			st["ok"] = true
 			st["t"] = float(n + 1) / hz
@@ -281,8 +277,6 @@ func t_stairs() -> void:
 		max_vy = maxf(max_vy, pc.velocity.y)
 		if pc.state == PlayerController.State.AIR:
 			air += 1
-			if OS.has_environment("AIR_DEBUG"):
-				print("AIRDBG2 n=%d pos=%s v=%s" % [n, pc.global_position, pc.velocity])
 		if t_top < 0.0 and pc.global_position.y > 1.78:
 			t_top = float(n) / hz
 		rig.update_rig(1.0 / hz)

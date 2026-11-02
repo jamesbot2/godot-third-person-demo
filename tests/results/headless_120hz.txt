@@ -1,8 +1,6 @@
 Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 
 INFO|physics_hz=120 engine=4.7.2-stable (official)
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 METRIC|jog_t90_s|0.1750
 RESULT|PASS|accel_jog_t90|t90=0.175s (expect ~0.17)
 METRIC|jog_stop_dist_m|0.3394
@@ -12,6 +10,8 @@ METRIC|sprint_t95_s|0.4500
 RESULT|PASS|sprint_buildup|t95=0.450s
 METRIC|sprint_stop_dist_m|0.8894
 RESULT|PASS|brake_dist_sprint|d=0.889
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 METRIC|sprint_exit_speed_0.1s|5.6000
 RESULT|PASS|sprint_exit_gradual|v@0.1s=5.60 v@0.5s=4.20
 METRIC|reverse_t90_s|0.3000
