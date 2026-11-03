@@ -608,7 +608,7 @@ func _rollprobe(st: Dictionary, tag: String) -> void:
 		_anim = pc.get_node("Model")
 	var xf := pc.global_transform
 	var parts := []
-	for b in ["pelvis", "head", "ball_l", "ball_r", "hand_l", "hand_r"]:
+	for b in ["pelvis", "Head", "ball_l", "ball_r", "hand_l", "hand_r"]:
 		var w := _bone_world(b)
 		var l := xf.affine_inverse() * w
 		var d: float = (l - (st[b] as Vector3)).length() if st.has(b) else 0.0
@@ -1281,12 +1281,41 @@ func t_anim() -> void:
 	var saw_roll := await _wait_anim("roll", 0.2)
 	var max_tilt := 0.0
 	var min_head := INF
+	# "flying" = the lowest body contact point (soles, hands, head/shoulder/
+	# pelvis surfaces) is off the floor: in a ground roll something touches
+	# the floor all the time. Measured over the roll's first half (the dive).
+	var max_float := 0.0
+	var max_pelvis := 0.0
+	var rad := {"hand_l": 0.03, "hand_r": 0.03, "Head": 0.11, "upperarm_l": 0.07, "upperarm_r": 0.07, "spine_02": 0.12, "pelvis": 0.11,
+		"ball_l": 0.024, "ball_r": 0.024, "foot_l": 0.093, "foot_r": 0.093}
+	var head_prev := Vector3.INF
+	var head_v_max := 0.0
 	for n in secs(0.6):
 		await tick()
 		max_tilt = maxf(max_tilt, absf(_anim.rotation.x) + absf(_anim.rotation.z))
-		min_head = minf(min_head, _bone_world("Head").y - pc.global_position.y)
+		var fy := pc.global_position.y
+		# head speed relative to the body (capsule frame): the entry crossfade
+		# from the upright jog into the inverted roll pose must not flip
+		var hl := pc.global_transform.affine_inverse() * _bone_world("Head")
+		if pc.state == PlayerController.State.ROLL and head_prev != Vector3.INF:
+			head_v_max = maxf(head_v_max, (hl - head_prev).length() * hz)
+		head_prev = hl
+		min_head = minf(min_head, _bone_world("Head").y - fy)
+		if pc.state == PlayerController.State.ROLL and pc.roll_time < pc.roll_duration * 0.5:
+			var low := INF
+			for b in rad:
+				low = minf(low, _bone_world(b).y - fy - rad[b])
+			max_float = maxf(max_float, low)
+			if OS.has_environment("ROLL_DEBUG"):
+				print("RF u=%.2f st=%.3f float=%.3f pelvis=%.2f head=%.2f drop=%.3f anim=%s clip_head=%.2f clip_pel=%.2f" % [pc.roll_time / pc.roll_duration, _anim._state_t, low, _bone_world("pelvis").y - fy, _bone_world("Head").y - fy, _anim._roll_drop_s, _anim.anim_state, _anim._cs_roll.at("Head", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y, _anim._cs_roll.at("pelvis", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y])
+			max_pelvis = maxf(max_pelvis, _bone_world("pelvis").y - fy)
 	release_all()
-	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9, "roll=%s model_tilt=%.3f min_head_h=%.2f" % [saw_roll, max_tilt, min_head])
+	metric("anim_roll_float_max_m", max_float)
+	metric("anim_roll_pelvis_max_m", max_pelvis)
+	metric("anim_roll_min_head_m", min_head)
+	metric("anim_roll_head_v_max", head_v_max)
+	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9 and min_head > 0.0 and max_float < 0.2 and head_v_max < 25.0,
+		"roll=%s model_tilt=%.3f min_head_h=%.2f dive: lowest contact off floor max=%.3f m pelvis max=%.2f m  head speed in body frame max=%.1f m/s" % [saw_roll, max_tilt, min_head, max_float, max_pelvis, head_v_max])
 	# vault + mantle map to their own states
 	await place(Vector3(L.VAULT_X, 0.02, L.VAULT_Z + 3.0))
 	press("move_forward")

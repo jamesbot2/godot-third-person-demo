@@ -79,7 +79,7 @@ const LEN_CWALK := 2.0
 @export var backward_exit_deg := 95.0
 
 # Roll clip window used for the controller's roll (s, clip time).
-const ROLL_T0 := 0.36
+const ROLL_T0 := 0.12
 const ROLL_T1 := 1.25
 const SLIDE_T0 := 0.30
 const SLIDE_T1 := 0.83
@@ -186,6 +186,12 @@ var _cs_vault: ClipSampler
 var _cs_mantle: ClipSampler
 var _cs_climb: ClipSampler    # core mode (Standard clips)
 var _cs_tuck: ClipSampler
+## roll: visual-root drop per clip time (see _sample_roll); the in-place roll
+## clip keeps the dive's flight height (root motion stripped), so without it
+## the body somersaults ~0.4 m above the floor at the start of the roll
+var _roll_drop := PackedFloat32Array()
+var _roll_drop_s := 0.0
+var _cs_roll: ClipSampler
 ## true: contact-driven traverse on the local extras clips; false: core mode
 var has_extras := false
 
@@ -325,6 +331,7 @@ func _sample_traverse_clips() -> void:
 		n = n.get_parent()
 	m.origin -= character.position
 	var bones: PackedStringArray = ["hand_l", "hand_r", "foot_l", "foot_r", "ball_l", "ball_r", "pelvis", "upperarm_l", "upperarm_r"]
+	_sample_roll(m)
 	if not has_extras:
 		_cs_climb = ClipSampler.sample(skeleton, m, clip_library().get_animation("climb"), bones)
 		_cs_tuck = ClipSampler.sample(skeleton, m, clip_library().get_animation("ninja_air"), bones)
@@ -422,7 +429,7 @@ func _build_tree() -> AnimationNodeStateMachine:
 		vt.connect_node("output", 0, _blend2(vt, "tuck_mix", vc, vtuck, Vector2(300, 100)))
 	sm.add_node("vault", vt, Vector2(900, 400))
 	var xfade := {"ground": 0.18, "jump": 0.08, "air": 0.2, "slide": 0.12, "slide_exit": 0.1,
-		"roll": 0.14, "mantle": 0.1, "vault": 0.1}
+		"roll": 0.10, "mantle": 0.1, "vault": 0.1}
 	for a in xfade:
 		for b in xfade:
 			if a != b:
@@ -644,6 +651,11 @@ func _drive_actions(_dt: float) -> void:
 			var u := clampf(_pc.roll_time / maxf(_pc.roll_duration, 0.01), 0.0, 1.0)
 			_p("roll/r_seek/seek_request", lerpf(ROLL_T0, ROLL_T1, u))
 			_p("roll/r_ts/scale", 0.0)
+			# fade the drop in with the 0.10 s state crossfade (the jog pose
+			# must not sink) and out again if the roll is cancelled
+			var fade := smoothstep(0.0, 0.10, _state_t) if _pc.state == PlayerController.State.ROLL else 0.0
+			_roll_drop_s = roll_drop(u) * fade
+			character.position.y -= _roll_drop_s
 		"mantle":
 			_p("mantle/c_seek/seek_request", _tr_clip_t if has_extras else lerpf(CLIMB_T0, CLIMB_T1, get_traverse_progress()))
 			_p("mantle/c_ts/scale", 0.0)
@@ -1169,6 +1181,59 @@ func _feed_arm_ik() -> void:
 	for i in 2:
 		_ik_tf[i].transform = inv * Transform3D(_ik_t[i].global_basis, _ik_tf_world[i])
 		_ik_pf[i].transform = inv * _ik_p[i].global_transform
+
+
+## Roll grounding: something is always on the floor in a ground roll (hands,
+## then shoulders/back, then feet). For each clip time in the roll window the
+## lowest contact point of the clip pose (joint height minus a body radius) is
+## measured and the visual root is lowered by that much, smoothed over
+## +-0.06 s so the drop never steps. Pure presentation.
+const ROLL_RADIUS := {"hand_l": 0.03, "hand_r": 0.03, "Head": 0.11, "upperarm_l": 0.07,
+	"upperarm_r": 0.07, "spine_02": 0.12, "pelvis": 0.11}
+const ROLL_DROP_N := 64
+
+
+func _sample_roll(m: Transform3D) -> void:
+	var bones := PackedStringArray(ROLL_RADIUS.keys())
+	for b in ClipSampler.SOLE:
+		bones.append(b)
+	var cs := ClipSampler.sample(skeleton, m, clip_library().get_animation("roll"), bones)
+	_cs_roll = cs
+	var raw := PackedFloat32Array()
+	for i in ROLL_DROP_N + 1:
+		var t := lerpf(ROLL_T0, ROLL_T1, float(i) / ROLL_DROP_N)
+		var low := cs.sole_min(t)
+		for b in ROLL_RADIUS:
+			low = minf(low, cs.at(b, t).y - ROLL_RADIUS[b])
+		raw.append(low)   # signed: lower a floating pose, lift a pose that sinks in
+	_roll_drop.resize(ROLL_DROP_N + 1)
+	var w := int(ceil(0.06 / ((ROLL_T1 - ROLL_T0) / ROLL_DROP_N)))
+	for i in ROLL_DROP_N + 1:
+		var acc := 0.0
+		var n := 0
+		for j in range(i - w, i + w + 1):
+			acc += raw[clampi(j, 0, ROLL_DROP_N)]
+			n += 1
+		_roll_drop[i] = acc / n
+	if OS.has_environment("ROLL_DEBUG"):
+		print("ROLL_DROP ", Array(_roll_drop).map(func(x): return snappedf(x, 0.01)))
+		var vmax := 0.0
+		var tt := 0.0
+		while tt < cs.t_len - 0.02:
+			var v := (cs.at("Head", tt + 1.0 / 60.0) - cs.at("Head", tt)).length() * 60.0
+			if tt >= ROLL_T0 - 0.01 and tt <= ROLL_T1:
+				vmax = maxf(vmax, v)
+			tt += 1.0 / 60.0
+		print("ROLL_CLIP window head_v_max (clip time) %.2f  x playback %.2f" % [vmax, (ROLL_T1 - ROLL_T0) / 0.6])
+
+
+## drop for roll progress u (0..1), faded in over the state crossfade
+func roll_drop(u: float) -> float:
+	if _roll_drop.is_empty():
+		return 0.0
+	var x := clampf(u, 0.0, 1.0) * ROLL_DROP_N
+	var i := mini(int(x), ROLL_DROP_N - 1)
+	return lerpf(_roll_drop[i], _roll_drop[i + 1], x - i)
 
 
 func get_traverse_progress() -> float:

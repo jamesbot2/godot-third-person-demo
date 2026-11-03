@@ -30,6 +30,7 @@ static func sample(skel: Skeleton3D, to_anim: Transform3D, anim: Animation, bone
 		elif anim.track_get_type(i) == Animation.TYPE_POSITION_3D:
 			pos_tr[b] = i
 	for bn in bones:
+		assert(skel.find_bone(bn) >= 0, "ClipSampler: no bone " + bn)   # g[-1] would silently read the last bone
 		s.pts[bn] = PackedVector3Array()
 	var frames := int(ceil(anim.length * RATE)) + 1
 	var g: Array[Transform3D] = []

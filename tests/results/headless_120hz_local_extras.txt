@@ -20,6 +20,8 @@ METRIC|turn90_overshoot_m|0.2596
 RESULT|PASS|turn_90|t=0.175s overshoot=0.26m vmax=4.20
 RESULT|PASS|no_instant_turn|max turn rate 898 deg/s
 RESULT|PASS|step_up_0.15|h=0.15 reached=true y_on_top=0.151 max_y=0.153 max_vy=0.00 air_ticks=0 t=0.93s
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|step_up_0.25|h=0.25 reached=true y_on_top=0.251 max_y=0.253 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.35|h=0.35 reached=true y_on_top=0.351 max_y=0.354 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.402 max_vy=0.00 air_ticks=0 t=0.93s
@@ -32,8 +34,6 @@ METRIC|stairs_up_time_s|1.0250
 RESULT|PASS|stairs_up_no_jump|t_top=1.02s max_y=1.810 air_ticks=0 jumps=0
 METRIC|stairs_cam_max_dy_per_tick|0.0396
 RESULT|PASS|stairs_camera_smooth|max cam dy/tick=0.0396
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|stairs_down_grounded|y=0.000 ungrounded_ticks=0
 RESULT|PASS|steep_stairs_0.25|reached=true y=2.001 t=1.18s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_up_10|angle=10 reached=true y=1.500 t=2.88s max_vy=0.00 air_ticks=0
@@ -168,7 +168,11 @@ METRIC|anim_diag_br_leg_err_deg|0.0000
 RESULT|PASS|anim_diag_br|v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=77 | IK off: clip slip med=0.91 (39%) drift=-0.06
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.36
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
-RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.05
+METRIC|anim_roll_float_max_m|0.1274
+METRIC|anim_roll_pelvis_max_m|0.8967
+METRIC|anim_roll_min_head_m|0.0663
+METRIC|anim_roll_head_v_max|18.8548
+RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.07 dive: lowest contact off floor max=0.127 m pelvis max=0.90 m  head speed in body frame max=18.9 m/s
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.026 m  planted wrist err=0.000 m  hand penetration=0.001 m  max sole penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=52 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
