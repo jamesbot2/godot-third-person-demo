@@ -84,13 +84,21 @@
 - core 与 extras 两种模式均 86/86 @30/60/120 Hz。
 - **未处理**：已推送的 `9e0060c` 中的 `ual_clips.res` 含存疑片段的烘焙数据；改写历史需仓库所有者确认。
 
+## Cycle 9 — Round 3：瞄准方向移动 + 起停（第 2 里程碑）
+
+- 新测试 8 项（6 项瞄准方向 + 2 项起停），总数 94。core 方向移动：骨盆扭转（瞄准上限 92°）+ 后退倒放（115°/95° 迟滞）。
+- FootIK：swing release（动画脚摆动时正常释放 + 抬脚弧线）、站定 settle 小步、锁定脚支撑高度双向快速跟随、翻越/攀爬进入时把越过立面的锁推回。
+- 起停断开 2–5 次 → 0；侧移/后退/斜后 pops 1–3 → 0；楼梯 120 Hz p90 0.073 → 0.047；extras 攀爬鞋底穿入 0.030 → 0。
+- 试过但撤回：起步 1/_move_s 循环加速（断开更多）；swing_min_offset 0.06/0.14（冲刺滑移中位数 0.36–0.89）。
+
 ## 可恢复状态（2026-11-03）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并**）。测试 86/86 @30/60/120 Hz，core 与 extras 两种模式（`tests/results/`）。
+- 分支 `dev/movement-system`，PR #1（**不要合并**）。测试 94/94 @30/60/120 Hz，core 与 extras 两种模式（`tests/results/`）。
 - 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`，不在仓库中）；或
   `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz>`；`UAL_EXTRAS=0` 强制 core。
 - 调试翻越/攀爬：`TRACE_TRAVERSE=1` 打印 PLAN/TR 行；`/workspace/eval/jumps.py <log> 0.07` 统计单帧跳变。
-- Round 3 进度：优先级 1（脚部 IK）、2（翻越/攀爬接触）完成；许可证拆分完成。
+- Round 3 进度：优先级 1（脚部 IK）、2（翻越/攀爬接触）完成；许可证拆分完成；优先级 3 的起停/侧移/后退/斜向完成（Cycle 9）。
+  剩余：原地 90°/180° 转身（plant-and-turn）、优先级 4 翻滚入口。
   优先级 3（起停/转身/侧移）：core 模式没有专门片段（Standard 包里没有 strafe/turn），只能程序化；
   extras 片段已烘焙但未接入（存疑，接入也只在本机生效）。上一次未提交的 extras 方向混合尝试在 git stash `wip-aimed-directional-backup`
   与运行机 `/workspace/backup_r3/wip_aimed_directional.patch`。优先级 4 翻滚入口未开始。

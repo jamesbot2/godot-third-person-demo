@@ -28,7 +28,9 @@ const BALL_REST := 0.0152       # ball_l rest height
 const ANKLE_MIN := 0.093        # ankle joint -> sole (heel) clearance
 const BALL_MIN := 0.024         # ball joint -> sole clearance
 const PLANT_H := 0.03           # animated contact height to plant
-const RELEASE_H := 0.06         # ... to release
+const RELEASE_H := 0.06         # ... to release (default)
+## release height actually used (the animator lowers it for reverse playback)
+var release_h := RELEASE_H
 const SIDES: Array[String] = ["l", "r"]
 
 ## 0..1 overall weight (animator fades it with the ground state)
@@ -58,6 +60,26 @@ var ground_s: Array[float] = [0.0, 0.0]                     # smoothed support h
 var plant_w: Array[float] = [0.0, 0.0]
 var pelvis_off := 0.0
 var _init_ground := false
+## swing detection: world-space speed of the UNLOCKED animated ball. In stance
+## the clip ball is (nearly) still in the world; in swing it travels at ~2x
+## body speed. A planted foot is released normally (no break, no pop) once
+## the clip clearly says "swing" even if the ball is still low (toe-off, and
+## reverse playback where the low part of the swing comes first).
+var swing_speed := 1.1
+var _prev_bw: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
+var _clip_v: Array[float] = [0.0, 0.0]
+var _prev_root := Vector3.ZERO
+var _root_v := 0.0
+## only near-break stances are released this way; normal stances end on height
+var swing_min_offset := 0.18
+var swing_hold: Array[bool] = [false, false]
+## procedural step arc: a foot that is released while still on the ground
+## (swing release, settle step, lock break) is lifted in proportion to the
+## distance it still has to travel, so it never skates flat across the floor
+var _lift: Array[float] = [0.0, 0.0]
+## settle step (standing still): set when a pinned foot is re-placed onto the
+## idle pose; cleared once it has arrived
+var settle: Array[bool] = [false, false]
 var debug := {}
 
 var _b := {}
@@ -97,6 +119,9 @@ func reset() -> void:
 		cooldown[i] = false
 		offset[i] = Vector3.ZERO
 		plant_w[i] = 0.0
+		swing_hold[i] = false
+		settle[i] = false
+		_clip_v[i] = 0.0
 	pelvis_off = 0.0
 	_init_ground = false
 
@@ -111,6 +136,9 @@ func _process_modification() -> void:
 			cooldown[i] = false
 			offset[i] = Vector3.ZERO
 			plant_w[i] = 0.0
+			swing_hold[i] = false
+			settle[i] = false
+			_clip_v[i] = 0.0
 		pelvis_off = 0.0
 		_init_ground = false
 		debug = {"planted": [false, false], "pelvis": 0.0}
@@ -124,6 +152,11 @@ func _process_modification() -> void:
 	var k_ground := 1.0 - exp(-22.0 * dt)
 	var k_rise := 1.0 - exp(-60.0 * dt)
 	var decay := exp(-11.0 * dt)
+	if _init_ground:
+		var rv := Vector2(xf.origin.x - _prev_root.x, xf.origin.z - _prev_root.z).length() / maxf(dt, 1e-4)
+		_root_v = lerpf(_root_v, rv if rv < 25.0 else _root_v, 1.0 - exp(-20.0 * dt))
+	_prev_root = xf.origin
+	var swing_thr := maxf(swing_speed, 0.5 + 0.6 * _root_v)
 	var tgt: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
 	var gnd_n: Array[Vector3] = [Vector3.UP, Vector3.UP]
 	var gball: Array[float] = [0.0, 0.0]
@@ -138,21 +171,45 @@ func _process_modification() -> void:
 		anim_ank[i] = A
 		var hc := minf(B.y - BALL_REST, A.y - ANKLE_REST)
 		var Bw := xf * B
+		var cv := 0.0
+		if _init_ground:
+			cv = Vector2(Bw.x - _prev_bw[i].x, Bw.z - _prev_bw[i].z).length() / maxf(dt, 1e-4)
+			if cv > 25.0:
+				cv = 0.0
+		_prev_bw[i] = Bw
+		_clip_v[i] = lerpf(_clip_v[i], cv, 1.0 - exp(-30.0 * dt))
+		if swing_hold[i] and not settle[i] and (hc > release_h or _clip_v[i] < swing_thr * 0.5 or _root_v < 0.35):
+			swing_hold[i] = false
+		if settle[i] and Vector2(offset[i].x, offset[i].z).length() < 0.01:
+			settle[i] = false
+			swing_hold[i] = false
 		# ---- stance / lock state machine (world space)
-		if cooldown[i] and (hc > RELEASE_H or Vector2(offset[i].x, offset[i].z).length() < 0.03):
+		if cooldown[i] and (hc > release_h or Vector2(offset[i].x, offset[i].z).length() < 0.03):
 			cooldown[i] = false
 		if planted[i]:
 			var o: Vector3 = lock_pos[i] - Bw
 			o.y = 0.0
 			var yaw_d := absf(wrapf(sk_yaw - lock_yaw[i], -PI, PI))
-			if hc > RELEASE_H or not lock_enabled or weight < 0.5:
+			if hc > release_h or not lock_enabled or weight < 0.5:
 				planted[i] = false
+			elif _root_v >= 0.35 and absf(ground_s[i]) < 0.05 and o.length() > swing_min_offset and (_clip_v[i] > swing_thr or hc > PLANT_H):
+				planted[i] = false
+				swing_hold[i] = true
+			elif _root_v < 0.35 and (o.length() > 0.2 or (o.length() > 0.05 and _clip_v[i] < 0.3)):
+				# standing still: keep the foot pinned while the clip blends
+				# into idle, then re-place it with a small procedural step
+				# (lifted arc) instead of skating it across the floor
+				planted[i] = false
+				swing_hold[i] = true
+				settle[i] = true
 			elif o.length() > max_lock_offset or yaw_d > max_lock_yaw or ground_s[i] < -max_lock_drop:
 				planted[i] = false
 				cooldown[i] = true
+				if OS.has_environment("FOOTIK_DEBUG"):
+					print("FOOTIK break ", s, " off=%.3f yaw=%.2f drop=%.2f cv=%.2f thr=%.2f rv=%.2f hc=%.3f" % [o.length(), yaw_d, ground_s[i], _clip_v[i], swing_thr, _root_v, hc])
 			else:
 				offset[i] = o
-		elif lock_enabled and weight >= 0.5 and not cooldown[i] and hc < PLANT_H:
+		elif lock_enabled and weight >= 0.5 and not cooldown[i] and not swing_hold[i] and hc < PLANT_H:
 			planted[i] = true
 			lock_pos[i] = Bw + offset[i]
 			lock_yaw[i] = sk_yaw
@@ -179,7 +236,10 @@ func _process_modification() -> void:
 		else:
 			# rise fast (a step edge under the foot must never be entered),
 			# fall at the normal rate
-			ground_s[i] = lerpf(ground_s[i], support, k_rise if support > ground_s[i] else k_ground)
+			# (a PLANTED foot follows both ways at the fast rate: with the slow fall
+			# a pinned ball on a stair tread hovered up to 8 cm while the
+			# visual root rose onto the next step)
+			ground_s[i] = lerpf(ground_s[i], support, k_rise if (support > ground_s[i] or planted[i]) else k_ground)
 		gank[i] = ga
 		gball[i] = gb
 		gnd_n[i] = nrm
@@ -193,11 +253,20 @@ func _process_modification() -> void:
 		# ---- target ankle (skeleton space)
 		var lo := inv.basis * ow
 		var lift := 0.0
-		if cooldown[i]:
-			lift = minf(0.05, Vector2(ow.x, ow.z).length() * 0.4)
+		var lift_t := 0.0
+		if swing_hold[i]:
+			lift_t = minf(0.07, Vector2(ow.x, ow.z).length() * 0.6 + 0.03 * _clip_v[i])
+		elif cooldown[i]:
+			lift_t = minf(0.05, Vector2(ow.x, ow.z).length() * 0.4)
+		_lift[i] = lerpf(_lift[i], lift_t, 1.0 - exp(-30.0 * dt))
+		lift = _lift[i]
 		var t := A + Vector3(lo.x, 0.0, lo.z)
-		t.y = A.y + ground_s[i] + lift
-		t.y = maxf(t.y, ga + ANKLE_MIN)
+		# break lift rides on the animated ankle (as before); the step arc of a
+		# swing/settle release is added on top of the ground clamp so the
+		# foot really leaves the floor
+		var arc := lift if swing_hold[i] else 0.0
+		t.y = A.y + ground_s[i] + (lift - arc)
+		t.y = maxf(t.y, ga + ANKLE_MIN) + arc
 		var req := gb + BALL_MIN
 		if t.y + v.y < req and v.length() > 0.01:
 			var e0 := asin(clampf(v.y / v.length(), -1.0, 1.0))

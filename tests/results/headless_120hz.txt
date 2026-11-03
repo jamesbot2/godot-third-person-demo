@@ -15,6 +15,8 @@ METRIC|sprint_exit_speed_0.1s|5.6000
 RESULT|PASS|sprint_exit_gradual|v@0.1s=5.60 v@0.5s=4.20
 METRIC|reverse_t90_s|0.3000
 RESULT|PASS|reverse_180|t=0.300s
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 METRIC|turn90_t_s|0.1750
 METRIC|turn90_overshoot_m|0.2596
 RESULT|PASS|turn_90|t=0.175s overshoot=0.26m vmax=4.20
@@ -23,8 +25,6 @@ RESULT|PASS|step_up_0.15|h=0.15 reached=true y_on_top=0.151 max_y=0.153 max_vy=0
 RESULT|PASS|step_up_0.25|h=0.25 reached=true y_on_top=0.251 max_y=0.253 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.35|h=0.35 reached=true y_on_top=0.351 max_y=0.354 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.402 max_vy=0.00 air_ticks=0 t=0.93s
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|step_block_0.50|h=0.50 reached=false y_on_top=0.001 max_y=0.001 max_vy=0.00 air_ticks=0 t=-1.00s
 RESULT|PASS|step_down_0.15|y=0.000 air_ticks=0
 RESULT|PASS|step_down_0.25|y=0.000 air_ticks=0
@@ -99,7 +99,7 @@ RESULT|PASS|fuzz_no_stuck_action_state|longest SLIDE/ROLL/TRAVERSE run=0.59s
 RESULT|PASS|anim_setup|bones=65 active=true
 METRIC|anim_idle_foot_y|0.0240
 RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.024 tpose=false
-METRIC|anim_walk_slip_p90|0.0001
+METRIC|anim_walk_slip_p90|0.0000
 METRIC|anim_walk_slip_med|0.0000
 METRIC|anim_walk_min_foot_y|0.0236
 METRIC|anim_walk_slip_drift|0.0000
@@ -112,20 +112,56 @@ RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.000m/s (0.
 METRIC|anim_sprint_slip_p90|0.0001
 METRIC|anim_sprint_slip_med|0.0000
 METRIC|anim_sprint_min_foot_y|0.0235
-METRIC|anim_sprint_slip_drift|0.0153
-RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.02m/s n=34 min_foot_y=0.024
-METRIC|anim_stairs_foot_pen|0.0006
+METRIC|anim_sprint_slip_drift|0.0112
+RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.01m/s n=23 min_foot_y=0.024
+METRIC|anim_startstop_walk_breaks|0.0000
+METRIC|anim_startstop_walk_slip_p90|0.0327
+RESULT|PASS|anim_startstop_walk|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.03 m/s n=211
+METRIC|anim_startstop_jog_breaks|0.0000
+METRIC|anim_startstop_jog_slip_p90|0.0412
+RESULT|PASS|anim_startstop_jog|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.04 m/s n=176
+METRIC|anim_stairs_foot_pen|0.0000
 METRIC|anim_stairs_foot_gap_med|0.0000
-METRIC|anim_stairs_foot_gap_p90|0.0663
-RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.066 m  max penetration=0.001 m  n=780 max_y=1.80
-METRIC|anim_ramp20_foot_pen|0.0010
-METRIC|anim_ramp20_foot_gap_med|0.0126
-METRIC|anim_ramp20_foot_gap_p90|0.0572
-RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.013 m p90=0.057 m  max penetration=0.001 m  n=600 max_y=1.00
+METRIC|anim_stairs_foot_gap_p90|0.0474
+RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.047 m  max penetration=0.000 m  n=780 max_y=1.80
+METRIC|anim_ramp20_foot_pen|0.0007
+METRIC|anim_ramp20_foot_gap_med|0.0063
+METRIC|anim_ramp20_foot_gap_p90|0.0462
+RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.006 m p90=0.046 m  max penetration=0.001 m  n=600 max_y=1.00
+METRIC|anim_aim_fwd_clip_slip_med|0.8994
+METRIC|anim_aim_fwd_slip_med|0.0000
+METRIC|anim_aim_fwd_lock_pops|0.0000
+METRIC|anim_aim_fwd_leg_err_deg|0.0000
+RESULT|PASS|anim_aim_fwd|v=3.00 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=83 | IK off: clip slip med=0.90 (30%) drift=-0.01
+METRIC|anim_strafe_left_clip_slip_med|0.9503
+METRIC|anim_strafe_left_slip_med|0.0000
+METRIC|anim_strafe_left_lock_pops|0.0000
+METRIC|anim_strafe_left_leg_err_deg|0.0001
+RESULT|PASS|anim_strafe_left|v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=90 | IK off: clip slip med=0.95 (35%) drift=0.05
+METRIC|anim_strafe_right_clip_slip_med|0.9064
+METRIC|anim_strafe_right_slip_med|0.0000
+METRIC|anim_strafe_right_lock_pops|0.0000
+METRIC|anim_strafe_right_leg_err_deg|0.0001
+RESULT|PASS|anim_strafe_right|v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=87 | IK off: clip slip med=0.91 (34%) drift=-0.04
+METRIC|anim_backpedal_clip_slip_med|0.8378
+METRIC|anim_backpedal_slip_med|0.0000
+METRIC|anim_backpedal_lock_pops|0.0000
+METRIC|anim_backpedal_leg_err_deg|0.0000
+RESULT|PASS|anim_backpedal|v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=94 | IK off: clip slip med=0.84 (39%) drift=0.15
+METRIC|anim_diag_fl_clip_slip_med|0.8789
+METRIC|anim_diag_fl_slip_med|0.0000
+METRIC|anim_diag_fl_lock_pops|0.0000
+METRIC|anim_diag_fl_leg_err_deg|0.0000
+RESULT|PASS|anim_diag_fl|v=2.91 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=76 | IK off: clip slip med=0.88 (30%) drift=0.01
+METRIC|anim_diag_br_clip_slip_med|0.9136
+METRIC|anim_diag_br_slip_med|0.0000
+METRIC|anim_diag_br_lock_pops|0.0000
+METRIC|anim_diag_br_leg_err_deg|0.0000
+RESULT|PASS|anim_diag_br|v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=77 | IK off: clip slip med=0.91 (39%) drift=-0.06
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.36
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
 RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.05
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.030 m  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
-RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=39 (0.33 s)  planted wrist err=0.001 m  hand penetration=0.000 m  max sole penetration=0.010 m
+RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=39 (0.33 s)  planted wrist err=0.001 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=120|pass=86|fail=0
+SUMMARY|hz=120|pass=94|fail=0

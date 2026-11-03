@@ -74,6 +74,7 @@ const LEN_CWALK := 2.0
 @export var cadence_curve := PackedVector2Array([Vector2(0.0, 1.4), Vector2(1.0, 1.6),
 	Vector2(1.8, 1.95), Vector2(3.0, 2.4), Vector2(4.2, 2.6), Vector2(6.8, 2.95), Vector2(9.0, 3.2)])
 @export var warp_limit_deg := 70.0
+@export var warp_limit_aim_deg := 92.0
 @export var backward_enter_deg := 115.0
 @export var backward_exit_deg := 95.0
 
@@ -125,6 +126,7 @@ var run_style := 0.0
 var cycle_rate := 0.0            # gait cycles per second (signed: <0 = backward)
 var land_weight := 0.0
 var warp_angle := 0.0
+var dir_w := Vector3.ZERO        # debug: (lateral, right, back) weight of the directional mix (extras only)
 
 var character: Node3D
 var skeleton: Skeleton3D
@@ -588,7 +590,9 @@ func _drive_ground(dt: float) -> void:
 	elif not _backward and ad > backward_enter_deg:
 		_backward = true
 	var target_warp := wrapf(theta - PI, -PI, PI) if _backward else theta
-	var lim := deg_to_rad(warp_limit_deg)
+	# aimed (body locked to the camera): the core library has no strafe
+	# clips, so the legs may yaw the full 90 deg (spine counter-twists)
+	var lim := deg_to_rad(warp_limit_aim_deg if _pc.is_aiming else warp_limit_deg)
 	target_warp = clampf(target_warp, -lim, lim) * clampf((v - 0.3) / 0.5, 0.0, 1.0)
 	warp_angle = lerp_angle(warp_angle, target_warp, 1.0 - exp(-12.0 * dt))
 
@@ -597,8 +601,10 @@ func _drive_ground(dt: float) -> void:
 	run_style = smoothstep(4.6, 6.6, v)
 	gait = _solve_gait(stride_need, run_style)
 	var s_blend := _stride_at(gait, run_style)
-	cycle_rate = v / s_blend * (-1.0 if _backward else 1.0)
 	_move_s = lerpf(_move_s, smoothstep(0.08, 0.7, v), 1.0 - exp(-12.0 * dt))
+	# (start/stop: a 1/_move_s cycle speed-up was tried and made lock breaks
+	# worse; start/stop slip is handled by FootIK's swing release + settle)
+	cycle_rate = v / s_blend * (-1.0 if _backward else 1.0)
 	var crouch_t := 1.0 if (_pc.is_crouched and p_state == "GROUND") else 0.0
 	_crouch_s = lerpf(_crouch_s, crouch_t, 1.0 - exp(-10.0 * dt))
 	_p("ground/walk_ts/scale", LEN_WALK * cycle_rate)
@@ -700,6 +706,8 @@ func _drive_traverse_contact(dt: float, st: String) -> void:
 		_plant_set = [false, false]
 		_tr_clip_t = 0.0
 		_vault_tail = false
+	if trav:
+		_keep_locks_off_face()
 	var right := _tr_fwd.cross(Vector3.UP).normalized()
 	var cap_f := cap.dot(_tr_fwd)
 	var tw := [0.0, 0.0]   # target hand weights
@@ -971,6 +979,23 @@ func _core_lift_at(u: float) -> float:
 	return lerpf(_core_lift[i], _core_lift[i + 1], x - i)
 
 
+## While the foot IK fades out at traverse entry a ball that is still pinned
+## from the run-up can sit a few cm past the obstacle face (the clip toe
+## reached into it on the last stride). Slide such locks back onto the floor
+## in front of the face; the clip pose itself is kept out by the root push.
+func _keep_locks_off_face() -> void:
+	if foot_ik == null or foot_ik.weight <= 0.0:
+		return
+	var lim := _tr_edge_f - 0.02
+	for i in 2:
+		if not foot_ik.planted[i]:
+			continue
+		var lp: Vector3 = foot_ik.lock_pos[i]
+		var f := lp.dot(_tr_fwd)
+		if f > lim and lp.y < _tr_top:
+			foot_ik.lock_pos[i] = lp - _tr_fwd * (f - lim)
+
+
 func _drive_traverse_core(dt: float, st: String) -> void:
 	var trav := st == "VAULT" or st == "MANTLE"
 	var cap := _pc.get_global_transform_interpolated().origin
@@ -986,6 +1011,8 @@ func _drive_traverse_core(dt: float, st: String) -> void:
 		_plant_set = [false, false]
 		_core_w = [0.0, 0.0]
 		_plan_core_lift(st == "MANTLE", cap)
+	if trav:
+		_keep_locks_off_face()
 	hand_contact = [false, false]
 	_tr_lean = 0.0   # (a modifier lean is not in the pose the post pass reads)
 	if not trav:
@@ -1170,6 +1197,9 @@ func _drive_procedural(dt: float, st: String) -> void:
 	if _foot_w < 0.002 and foot_t == 0.0:
 		_foot_w = 0.0
 	foot_ik.weight = _foot_w
+	# a pinned ball normally leaves via FootIK's swing release (clip ball
+	# speed / toe-off height); 0.24 m is only the hard safety break
+	foot_ik.max_lock_offset = 0.24
 	foot_ik.dt = dt
 	foot_ik.active = _foot_w > 0.0
 	_drop_s = lerpf(_drop_s, drop_t, 1.0 - exp(-10.0 * dt))

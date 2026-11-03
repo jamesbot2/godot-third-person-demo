@@ -93,7 +93,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 86
+const EXPECTED_TOTAL := 94
 
 
 func want(name: String) -> bool:
@@ -1026,6 +1026,52 @@ func t_anim() -> void:
 		release_all()
 		if spec[0] == "walk":
 			press("walk_toggle"); await tick(); release("walk_toggle")
+	# start / stop transitions: idle -> walk/jog -> idle. Foot locks must not
+	# break (a break = the pinned foot visibly slides back to the clip pose)
+	# and planted feet must not skate while the body accelerates/brakes.
+	for spec in [["walk", true], ["jog", false]]:
+		await place(Vector3(4, 0.02, 20))
+		await tick(secs(0.6))
+		var fk = _anim.foot_ik
+		var breaks := [0, 0]
+		var slips: Array[float] = []
+		var prev := {}
+		for phase in 2:
+			if phase == 0:
+				press("move_forward")
+				if spec[1]:
+					press("walk_toggle"); await tick(); release("walk_toggle")
+			else:
+				release("move_forward")
+			for n in secs(1.2):
+				var was_cd: Array = fk.cooldown.duplicate()
+				await tick()
+				for k in 2:
+					if fk.cooldown[k] and not was_cd[k]:
+						breaks[phase] += 1
+				var floor_y := pc.global_position.y
+				var lo := ""
+				var lo_y := INF
+				for b in ["ball_l", "ball_r"]:
+					var bp := _bone_world(b)
+					if bp.y < lo_y:
+						lo_y = bp.y
+						lo = b
+				for b in ["ball_l", "ball_r"]:
+					var bp := _bone_world(b)
+					if prev.has(b) and b == lo and bp.y - floor_y < 0.035:
+						slips.append(Vector2(bp.x - prev[b].x, bp.z - prev[b].z).length() * hz)
+					prev[b] = bp
+		release_all()
+		if spec[1]:
+			press("walk_toggle"); await tick(); release("walk_toggle")
+		slips.sort()
+		var med := slips[slips.size() / 2] if slips.size() > 0 else -1.0
+		var p90 := slips[int(slips.size() * 0.9)] if slips.size() > 0 else -1.0
+		metric("anim_startstop_%s_breaks" % spec[0], breaks[0] + breaks[1])
+		metric("anim_startstop_%s_slip_p90" % spec[0], p90)
+		check("anim_startstop_%s" % spec[0], breaks[0] + breaks[1] == 0 and med < 0.05 and p90 < 0.5,
+			"lock breaks start=%d stop=%d  planted slip med=%.3f p90=%.2f m/s n=%d" % [breaks[0], breaks[1], med, p90, slips.size()])
 	# feet on uneven ground: stairs up/down and a 20 deg ramp up/down
 	for spec in [["stairs", Vector3(L.STAIR_X, 0.02, L.STAIR_Z0 + 1.5), 6.5], ["ramp20", Vector3(L.ramp_x(1), 0.02, L.RAMP_Z0 + 1.5), 5.0]]:
 		await place(spec[1])
@@ -1051,6 +1097,92 @@ func t_anim() -> void:
 		# a released trailing foot briefly hangs ~5-6 cm while it catches up (measured, documented)
 		check("anim_feet_%s" % spec[0], gaps.size() > secs(1.0) and pen < 0.02 and fmed < 0.02 and fp90 < 0.07,
 			"lowest-foot sole gap over ground: median=%.3f m p90=%.3f m  max penetration=%.3f m  n=%d max_y=%.2f" % [fmed, fp90, pen, gaps.size(), maxf(g["max_y"], g2["max_y"])])
+	# aimed strafe / backpedal / diagonal: the body faces the camera and the
+	# legs carry it in the movement direction. Core library has no directional
+	# clips: legs = forward cycle with the pelvis yawed toward the movement
+	# (orientation warp, spine counter-twists) or reverse playback for
+	# backpedal. Two passes:
+	#  1. foot IK off -> "clip slip" metric only (how well the warped clip
+	#     matches the ground motion before IK; reported, not gated)
+	#  2. foot IK on (shipping config): planted-ball slip < 10 % of speed, no
+	#     drift, no lock breaks (visible pops), face error < 10 deg, legs
+	#     pointing within 25 deg of the movement (or its reverse)
+	for spec in [["aim_fwd", ["move_forward"]], ["strafe_left", ["move_left"]], ["strafe_right", ["move_right"]],
+			["backpedal", ["move_back"]], ["diag_fl", ["move_forward", "move_left"]], ["diag_br", ["move_back", "move_right"]]]:
+		var res := {}
+		for pass_ik in [false, true]:
+			await place(Vector3(4, 0.02, 20))
+			_anim.foot_ik_enabled = pass_ik
+			press("aim")
+			await tick(secs(0.3))
+			for a in spec[1]:
+				press(a)
+			await tick(secs(1.2))
+			var fk = _anim.foot_ik
+			var prev := {}
+			var slips: Array[float] = []
+			var drift := 0.0
+			var pops := 0
+			var max_face := 0.0
+			var max_leg := 0.0
+			var tp_ok := true
+			var vs := 0.0
+			var n_s := secs(1.2)
+			for n in n_s:
+				var was_cd: Array = fk.cooldown.duplicate()
+				await tick()
+				var hv := pc.velocity * Vector3(1, 0, 1)
+				var mdir := hv.normalized()
+				var floor_y := pc.global_position.y
+				var lo := ""
+				var lo_y := INF
+				for b in ["ball_l", "ball_r"]:
+					var bp := _bone_world(b)
+					if bp.y < lo_y:
+						lo_y = bp.y
+						lo = b
+				for b in ["ball_l", "ball_r"]:
+					var bp := _bone_world(b)
+					if prev.has(b) and b == lo and bp.y - floor_y < 0.035:
+						var dv: Vector3 = (bp - prev[b]) * hz
+						slips.append(Vector2(dv.x, dv.z).length())
+						drift += dv.dot(mdir)
+					prev[b] = bp
+				for k in 2:
+					if fk.cooldown[k] and not was_cd[k]:
+						pops += 1
+				max_face = maxf(max_face, absf(rad_to_deg(wrapf(pc.facing_yaw - pc.get_camera_yaw(), -PI, PI))))
+				# leg heading = facing + warp; compare with movement (mod 180 for reverse playback)
+				if hv.length() > 0.5:
+					var mv_yaw := atan2(-hv.x, -hv.z)
+					var leg_yaw: float = pc.facing_yaw + _anim.warp_angle
+					var e := absf(wrapf(mv_yaw - leg_yaw, -PI, PI))
+					e = minf(e, PI - e)
+					max_leg = maxf(max_leg, rad_to_deg(e))
+				vs += hv.length() / n_s
+				if not _not_tpose():
+					tp_ok = false
+			release_all()
+			await tick()
+			slips.sort()
+			var key := "ik_" if pass_ik else "fk_"
+			res[key + "med"] = slips[slips.size() / 2] if slips.size() > 0 else -1.0
+			res[key + "p90"] = slips[int(slips.size() * 0.9)] if slips.size() > 0 else -1.0
+			res[key + "drift"] = drift / maxf(slips.size(), 1)
+			res[key + "n"] = slips.size()
+			if pass_ik:
+				res["v"] = vs
+				res["pops"] = pops
+				res["face"] = max_face
+				res["leg"] = max_leg
+				res["tp"] = tp_ok
+		_anim.foot_ik_enabled = true
+		metric("anim_%s_clip_slip_med" % spec[0], res["fk_med"])
+		metric("anim_%s_slip_med" % spec[0], res["ik_med"])
+		metric("anim_%s_lock_pops" % spec[0], res["pops"])
+		metric("anim_%s_leg_err_deg" % spec[0], res["leg"])
+		check("anim_%s" % spec[0], res["tp"] and res["ik_n"] > secs(0.3) and res["ik_med"] < 0.1 * res["v"] and absf(res["ik_drift"]) < 0.15 * res["v"] and res["pops"] == 0 and res["face"] < 10.0 and res["leg"] < 25.0,
+			"v=%.2f IK on: slip med=%.3f m/s (%.0f%% of v) p90=%.2f drift=%.2f pops=%d face_err=%.1fdeg leg_err=%.0fdeg n=%d | IK off: clip slip med=%.2f (%.0f%%) drift=%.2f" % [res["v"], res["ik_med"], 100.0 * res["ik_med"] / maxf(res["v"], 0.01), res["ik_p90"], res["ik_drift"], res["pops"], res["face"], res["leg"], res["ik_n"], res["fk_med"], 100.0 * res["fk_med"] / maxf(res["v"], 0.01), res["fk_drift"]])
 	# jump -> air -> land
 	await place(Vector3(0, 0.02, 4))
 	press("jump"); await tick(); release("jump")
