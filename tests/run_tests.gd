@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 101
+const EXPECTED_TOTAL := 102
 
 
 func want(name: String) -> bool:
@@ -821,8 +821,19 @@ func t_crates() -> void:
 	var max_y := 0.0
 	var max_vy := 0.0
 	var max_tilt := 0.0
+	var am: Node = pc.get_node("Model")
+	var push_n := 0
+	var push_anim := 0.0
+	var push_vel := 0.0
+	var push_disp := 0.0
 	for n in secs(2.0):
+		var pp := pc.global_position
 		await tick()
+		if pc.is_pushing and n > secs(1.2):
+			push_n += 1
+			push_anim += float(am.p_speed)
+			push_vel += Vector2(pc.velocity.x, pc.velocity.z).length()
+			push_disp += Vector2(pc.global_position.x - pp.x, pc.global_position.z - pp.z).length() * Engine.physics_ticks_per_second
 		max_y = maxf(max_y, pc.global_position.y)
 		max_vy = maxf(max_vy, pc.velocity.y)
 		max_tilt = maxf(max_tilt, rad_to_deg(light.global_basis.y.angle_to(Vector3.UP)))
@@ -834,6 +845,14 @@ func t_crates() -> void:
 	# push_speed_max (2 m/s) for the rest of 2 s -> ~3.1 m; was
 	# 3.45/3.40/2.31 m at 30/60/120 Hz with the crate tumbling at 30/60.
 	check("crate_push_rate_independent", absf(moved - 3.12) < 0.15 and max_tilt < 5.0, "crate moved=%.2fm (want 3.12+-0.15) max tilt=%.1f deg" % [moved, max_tilt])
+	# Round 6: while pushing, move_and_slide clips velocity to ~0 though the
+	# body moves with the crate; the animator must use the real displacement
+	# (was: idle pose sliding along at ~2 m/s).
+	var pn := maxf(push_n, 1)
+	metric("crate_push_anim_speed", push_anim / pn)
+	metric("crate_push_body_speed", push_disp / pn)
+	metric("crate_push_clipped_vel", push_vel / pn)
+	check("crate_push_anim_walks", push_n > 5 and absf(push_anim / pn - push_disp / pn) < 0.35 and push_anim / pn > 1.2, "pushing ticks=%d anim speed=%.2f body speed=%.2f (clipped velocity %.2f)" % [push_n, push_anim / pn, push_disp / pn, push_vel / pn])
 	var hp0 := heavy.global_position
 	await place(hp0 + Vector3(0, 0.02 - hp0.y, 2.0))
 	press("move_forward")

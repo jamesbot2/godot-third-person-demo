@@ -491,6 +491,25 @@ func _run() -> void:
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.3)
 
+	# crate push (light Crate2): walk into it from 2 m, keep pushing
+	if seg("crate_push"):
+		var crate: Node3D = main.get_node("Props/Crate2")
+		var c0 := crate.global_position
+		await place(c0 + Vector3(0, 0.02 - c0.y, 2.0), 0.0, 0.0)
+		# high side camera: the neighbouring crates (1.5 m apart) hide a low one
+		cam(Vector3(2.6, 1.8, 1.4), 0.7, 48.0)
+		move_world = fwd
+		await frames(0.55); await shot("crate_contact")
+		await closeup("crate_push_contact", Vector3(1.4, 1.3, 0.5), 0.7, 40.0)
+		await frames(0.5); await shot("crate_push")
+		await closeup("crate_push_side", Vector3(1.6, 1.2, -0.2), 0.7, 40.0)
+		await closeup("crate_push_feet", Vector3(1.2, 0.9, 0.9), -0.5, 38.0, true)
+		var line := "CRATE|moved=%.2fm player=%s crate=%s" % [crate.global_position.distance_to(c0), pc.global_position, crate.global_position]
+		print(line)
+		log_lines.append(line)
+		cam(Vector3.ZERO)
+		release_all(); await frames(0.3)
+
 	var f := FileAccess.open(shots_dir + "/shots.log", FileAccess.WRITE)
 	f.store_string("\n".join(log_lines) + "\n")
 	f.close()

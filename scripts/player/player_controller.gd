@@ -173,6 +173,12 @@ var roll_time := 0.0
 var roll_dir := Vector3.FORWARD
 var roll_start_speed := 0.0
 var step_count := 0
+## Round 6: true horizontal displacement velocity of the last tick and whether
+## a prop was being pushed. While pushing, move_and_slide clips `velocity` to
+## ~0 against the crate although the body keeps moving with it, so the
+## animator reads `move_velocity` instead (otherwise: idle pose sliding).
+var move_velocity := Vector3.ZERO
+var is_pushing := false
 var sim_time := 0.0
 var current_height := 1.8
 var accel_world := Vector3.ZERO
@@ -268,6 +274,7 @@ func get_camera_yaw() -> float:
 # ------------------------------------------------------------ main update ---
 func _physics_process(dt: float) -> void:
 	sim_time += dt
+	is_pushing = false
 	var e := _gather_input(dt)
 	slide_cooldown = maxf(slide_cooldown - dt, 0.0)
 	slide_boost_timer = maxf(slide_boost_timer - dt, 0.0)
@@ -330,7 +337,10 @@ func _integrate_and_move(dt: float, v_old: Vector3, v_new: Vector3) -> void:
 				v_mid.y = 0.0
 				v_new.y = 0.0
 	velocity = v_mid
+	var pos0 := global_position
 	move_and_slide()
+	move_velocity = (global_position - pos0) / dt
+	move_velocity.y = 0.0
 	var v_final := v_new + (velocity - v_mid)   # keep collision clipping
 	velocity = v_final
 	# Push toward the speed the player is *trying* to move at (input), since the
@@ -940,6 +950,7 @@ func _push_props(intended_hv: Vector3, dt: float) -> void:
 		if test_move(global_transform, intended_hv / ih * PUSH_REACH, probe, 0.001, true, 1):
 			contacts.append(probe)
 	var done := {}
+	is_pushing = false
 	for c in contacts:
 		var rb := c.get_collider() as RigidBody3D
 		if rb == null or done.has(rb):
@@ -950,6 +961,8 @@ func _push_props(intended_hv: Vector3, dt: float) -> void:
 		if push_dir.length() < 0.1:
 			continue
 		push_dir = push_dir.normalized()
+		if intended_hv.dot(push_dir) > 0.1:
+			is_pushing = true
 		# Velocity servo with a force budget (Round 5). The old version
 		# applied a saturated 450 N impulse at centre height; the crate's
 		# response then depended on the tick rate (3.45/3.40/2.31 m at

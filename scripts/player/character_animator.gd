@@ -630,6 +630,8 @@ func update_presentation(dt: float) -> void:
 	_last_pos = _pc.global_position
 	var v3 := _pc.velocity
 	var hv := Vector3(v3.x, 0, v3.z)
+	if _pc.is_pushing:
+		hv = _pc.move_velocity   # clipped velocity ~0 while the crate moves
 	var k := 1.0 - exp(-14.0 * dt)
 	var new_vel := _vel_s.lerp(hv, k)
 	_acc_s = _acc_s.lerp((new_vel - _vel_s) / dt, 1.0 - exp(-8.0 * dt))
