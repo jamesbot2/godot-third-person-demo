@@ -23,7 +23,7 @@ var main: Node
 var pc: PlayerController
 var rig: CameraRig
 var anim: Node
-var shots_dir := "/workspace/acceptance/round4"
+var shots_dir := "/workspace/acceptance/round5"
 var only: PackedStringArray = []
 var move_world := Vector3.ZERO   # desired world-space move direction (re-mapped every frame)
 var orbit_rate := 0.0            # camera yaw rad/s
@@ -449,7 +449,9 @@ func _run() -> void:
 		Input.action_release("jump")
 		await wait_progress(0.4); await shot("vault_over_a")
 		await wait_progress(0.55); await shot("vault_over_b")
-		await closeup("vault_over", Vector3(2.4, 0.3, 0.4), 0.0, 45.0, true)
+		# Round 5: pulled back and raised (was (2.4,0.3,0.4)/0.0/45 deg, which
+		# cropped the head and had the box filling the foreground)
+		await closeup("vault_over", Vector3(3.4, 0.9, 0.9), 0.3, 48.0, true)
 		await wait_progress(0.7); await shot("vault_release")
 		await wait_progress(0.86); await shot("vault_clear")
 		await frames(0.25); await shot("vault_land")
