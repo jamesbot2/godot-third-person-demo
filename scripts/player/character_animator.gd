@@ -1400,6 +1400,8 @@ func _feed_arm_ik() -> void:
 const ROLL_RADIUS := {"hand_l": 0.03, "hand_r": 0.03, "Head": 0.11, "upperarm_l": 0.07,
 	"upperarm_r": 0.07, "spine_02": 0.12, "pelvis": 0.11}
 const ROLL_DROP_N := 64
+## half-width (drop samples) of the moving-max envelope before smoothing
+const ROLL_DROP_CORR_W := 2
 
 
 func _sample_roll(m: Transform3D) -> void:
@@ -1428,6 +1430,29 @@ func _sample_roll(m: Transform3D) -> void:
 			acc += raw[clampi(j, 0, ROLL_DROP_N)]
 			n += 1
 		_roll_drop[i] = acc / n
+	# round 6: the plain average under-drops where the pose's lowest contact
+	# peaks (hand plant: hands 2-4 cm off the floor -> pelvis 0.57 m). Never
+	# leave the lowest contact floating: the shortfall (raw - average, >= 0)
+	# is enveloped (moving max +-ROLL_DROP_CORR_W) and smoothed, then added
+	if OS.get_environment("ROLL_DROP_PLAIN") != "1":
+		var corr := PackedFloat32Array()
+		corr.resize(ROLL_DROP_N + 1)
+		for i in ROLL_DROP_N + 1:
+			corr[i] = maxf(raw[i] - _roll_drop[i], 0.0)
+		var cw := ROLL_DROP_CORR_W
+		var cenv := PackedFloat32Array()
+		cenv.resize(ROLL_DROP_N + 1)
+		for i in ROLL_DROP_N + 1:
+			for j in range(i - cw, i + cw + 1):
+				cenv[i] = maxf(cenv[i], corr[clampi(j, 0, ROLL_DROP_N)])
+		for i in ROLL_DROP_N + 1:
+			var acc := 0.0
+			var ws := 0.0
+			for j in range(i - cw, i + cw + 1):
+				var wj := 1.0 - absf(j - i) / float(cw + 1)
+				acc += cenv[clampi(j, 0, ROLL_DROP_N)] * wj
+				ws += wj
+			_roll_drop[i] += acc / ws
 	if OS.has_environment("ROLL_DEBUG"):
 		print("ROLL_DROP ", Array(_roll_drop).map(func(x): return snappedf(x, 0.01)))
 		var vmax := 0.0

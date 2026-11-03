@@ -1419,11 +1419,15 @@ func t_anim() -> void:
 		min_head = minf(min_head, _bone_world("Head").y - fy)
 		if pc.state == PlayerController.State.ROLL and pc.roll_time < pc.roll_duration * 0.5:
 			var low := INF
+			var low_b := ""
 			for b in rad:
-				low = minf(low, _bone_world(b).y - fy - rad[b])
+				var hb: float = _bone_world(b).y - fy - rad[b]
+				if hb < low:
+					low = hb
+					low_b = b
 			max_float = maxf(max_float, low)
 			if OS.has_environment("ROLL_DEBUG"):
-				print("RF u=%.2f st=%.3f float=%.3f pelvis=%.2f head=%.2f drop=%.3f anim=%s clip_head=%.2f clip_pel=%.2f" % [pc.roll_time / pc.roll_duration, _anim._state_t, low, _bone_world("pelvis").y - fy, _bone_world("Head").y - fy, _anim._roll_drop_s, _anim.anim_state, _anim._cs_roll.at("Head", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y, _anim._cs_roll.at("pelvis", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y])
+				print("RF low=%s u=%.2f st=%.3f float=%.3f pelvis=%.2f head=%.2f drop=%.3f anim=%s clip_head=%.2f clip_pel=%.2f" % [low_b, pc.roll_time / pc.roll_duration, _anim._state_t, low, _bone_world("pelvis").y - fy, _bone_world("Head").y - fy, _anim._roll_drop_s, _anim.anim_state, _anim._cs_roll.at("Head", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y, _anim._cs_roll.at("pelvis", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y])
 			var ph := _bone_world("pelvis").y - fy
 			max_pelvis = maxf(max_pelvis, ph)
 			if _anim._state_t >= 0.10:
@@ -1443,7 +1447,7 @@ func t_anim() -> void:
 	metric("anim_roll_min_head_m", min_head)
 	metric("anim_roll_head_v_max", head_v_max)
 	metric("anim_roll_dive_span_m", dive_span)
-	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9 and min_head > 0.0 and max_float < 0.2 and head_v_max < 25.0 and dive_span < 1.25 and pel_post < 0.6 and pel_rise < 0.05,
+	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9 and min_head > 0.0 and max_float < 0.2 and head_v_max < 25.0 and dive_span < 1.25 and pel_post <= 0.55 and pel_rise < 0.05,
 		"roll=%s model_tilt=%.3f min_head_h=%.2f dive: lowest contact off floor max=%.3f m pelvis max=%.2f m (after entry crossfade %.2f m, rise %.3f m)  head speed in body frame max=%.1f m/s  pitched head-feet span max=%.2f m" % [saw_roll, max_tilt, min_head, max_float, max_pelvis, pel_post, pel_rise, head_v_max, dive_span])
 	# round 4: 180 deg sharp turn at jog speed -- legs must not cross
 	# (feet / knees measured along the hip axis thigh_l->thigh_r; <0 = crossed)
