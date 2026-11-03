@@ -69,4 +69,8 @@ Round 4 新增的派生片段（`roll_tuck`、`walk_bwd`/`jog_bwd`/`sprint_bwd`�
 Round 5 新增的瞄准移动片段（`aim_fwd`/`aim_bwd` 与 6 个侧移/斜向交叉步片段，见 `scripts/player/strafe_gait.gd`）同样是派生数据：
 运行时在内存中由已提交的 CC0 Standard 走/慢跑片段（及其派生的后退片段）计算（相位对齐混合 + 双骨 IK 重定向），不入库、不引入新的第三方数据。
 
+Round 6：`aim_fwd`/`aim_bwd` 改为与侧移相同的方式由 CC0 前进/后退片段重新摆姿（支撑脚沿移动反方向扫过、双骨 IK），
+斜后方片段改用后退片段为底；侧移/斜向片段增加髋部反向转动。仍然只在运行时内存中计算，不入库、不引入新的第三方数据。
+推箱子特写只改了展示脚本与动画速度来源，没有新资源。**提醒：PR #1 仍然只能 squash merge（见上文 `9e0060c` 说明）。**
+
 Standard 包（UBC、UAL1 Standard、UAL2 Standard）的结论不变：CC0，直接从作者的 itch.io 页面以 $0 获得。

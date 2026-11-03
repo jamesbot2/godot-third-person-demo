@@ -122,17 +122,28 @@
   初版（支撑 0.5、宽度 0.8、步幅 1.7）最宽时两腿分得过开，改为 0.42 / 0.6 / 1.6。
 - core 101/101 @30/60/120；extras 98/101。
 
-## 可恢复状态（2026-11-03，Cycle 12 之后）
+## Cycle 13 — Round 6（0f3d41e, 6fd70de, a1a0fbd, 8ef32b1, 96c1e44, ecd2327）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 101/101 @30/60/120 Hz；本机 extras 98/101。
+- 翻滚：逐帧分析（`ROLL_DEBUG=1`）定位峰值在撑手阶段（下落曲线平均后下沉不足，手离地 2–4 cm），不是倒立前的过渡帧。补回包络后入口淡入后骨盆 0.57 → 0.52 m，门限收紧到 ≤ 0.55。`ROLL_DROP_PLAIN=1` 做 A/B。
+- 瞄准前进/后退：在源头重新摆姿（同 `StrafeGait`），片段滑步 1.02/0.81 m/s → ≈ 0。后退初版膝前伸 0.376 m（门限 0.33），改为单独支撑占比 0.38、抬脚 0.08、步幅 ×0.7 后 0.324–0.326。`AIM_FB_RAW=1` 做 A/B。
+- 侧移：步幅 1.3、内收 0.4，最宽站距 1.14 → 0.90 m；降低 SIDE_TAN 无效且引入抬脚速度台阶，放弃。髋部反向转动 ±7°（先试的方向让髋跟着胸转、扭转反而变小，改了符号；后退底片段的肩摆相位相反，所以 z<0 时再翻一次符号）。胸部朝向用锁骨线测量（上臂线会被手臂摆动污染）。
+- 斜后方：后退底 + 单独支撑/抬脚/偏晚抬脚 + 步幅 1.5，最宽 1.52 → 1.16 m。节奏改进无硬指标（`step_asym` 之前已 ≈ 0）。
+- 推箱子特写：发现推动时角色站着滑行（碰撞把 `velocity` 截到 ~0.18 m/s @60 Hz）。动画在推动时改用真实位移速度，新增 `crate_push_anim_walks`。特写用高机位避开相邻箱子。
+- README 增加 M2 试玩清单。
+- 测试中途踩坑：用 Python `str.replace` 插入测试代码时命中了另一个测试里相同的代码块，产生重复插入 → 解析错误；改为 `count()==1` 断言后再替换。
+- core 102/102 @30/60/120；extras 99/102。
+
+## 可恢复状态（2026-11-03，Cycle 13 之后）
+
+- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 102/102 @30/60/120 Hz；本机 extras 99/102。
 - 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`）；或
   `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz> [--only=t_anim]`；`UAL_EXTRAS=0` 强制 core；`FOOTIK_DEBUG=1` 打印锁脚跳脱。
-- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`、`ROLL_NOCAP=1`/`ROLL_CAP=<m>`、`BWD_RAW=1`、`AIM_WARP=1`（瞄准移动改回 warp，做 A/B）。
+- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`、`ROLL_NOCAP=1`/`ROLL_CAP=<m>`、`ROLL_DROP_PLAIN=1`、`BWD_RAW=1`、`AIM_WARP=1`、`AIM_FB_RAW=1`（瞄准前后改回旧混合）、`PUSH_DEBUG=1`。
   新增 class_name 脚本后先跑一次 `godot --headless --editor --quit --path .` 刷新类缓存。
-- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round5`）；第 5 轮产物在 `/workspace/acceptance/round5/`。
-- 剩余问题：翻滚入口后骨盆 0.57 m（目标 0.55；上限只作用于倒立帧，峰值可能在进入倒立前的过渡帧）；侧移最宽时步子偏大、上身仍是前进片段；瞄准前进/后退的片段滑步（0.8–1.0 m/s）仍靠 IK 锁脚抵消；
-  后退只是适度改善；30 Hz 翻越单帧跳变 0.32 m（9.6 m/s，门限内）；extras 模式 3 项失败。
-- 未验收（需 M2 真机）：所有动态观感。
+- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round6`）；第 6 轮产物在 `/workspace/acceptance/round6/`。
+- 剩余问题：推箱子没有推姿势（手不扶箱子）；后退膝前伸 0.325 m 离门限 0.33 只差 0.5 cm、步频偏高；斜后方“节奏”只有观感判断；
+  侧移手臂仍是前进片段；后退 → 瞄准前进切换有一帧略蹲；30 Hz 翻越单帧跳变（门限内）；extras 模式 3 项失败。
+- 未验收（需 M2 真机，按 README 试玩清单）：所有动态观感。
 
 ## 下一步优先级
 
