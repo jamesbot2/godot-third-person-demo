@@ -23,7 +23,7 @@ var main: Node
 var pc: PlayerController
 var rig: CameraRig
 var anim: Node
-var shots_dir := "/workspace/acceptance/round3"
+var shots_dir := "/workspace/acceptance/round4"
 var only: PackedStringArray = []
 var move_world := Vector3.ZERO   # desired world-space move direction (re-mapped every frame)
 var orbit_rate := 0.0            # camera yaw rad/s
@@ -62,8 +62,6 @@ func _initialize() -> void:
 	cvp.add_child(ccam)
 	ccam.current = true
 	ccam.cull_mask = 1                      # close-ups hide course labels
-	for lb in main.find_children("*", "Label3D", true, false):
-		(lb as Label3D).layers = 2
 	DirAccess.make_dir_recursive_absolute(shots_dir + "/closeups")
 	cvp.render_target_update_mode = SubViewport.UPDATE_ONCE  # warm-up render
 	_run.call_deferred()
@@ -150,6 +148,10 @@ func closeup(name: String, off: Vector3, look_h := 0.3, fov := 32.0, on_pelvis :
 	if on_pelvis:
 		var sk: Skeleton3D = anim.skeleton
 		target = (sk.global_transform * sk.get_bone_global_pose(sk.find_bone("pelvis"))).origin + Vector3(0, look_h, 0)
+	# course labels are built after setup: move them to layer 2 (not in the
+	# close-up camera's cull mask) right before every close-up render
+	for lb in main.find_children("*", "Label3D", true, false):
+		(lb as Label3D).layers = 2
 	ccam.fov = fov
 	ccam.global_position = target + off
 	ccam.look_at(target, Vector3.UP)
@@ -203,6 +205,14 @@ func wait_progress(u: float, timeout := 2.0) -> void:
 		elif pc.state == PlayerController.State.TRAVERSE:
 			p = anim.get_traverse_progress()
 		if p >= u:
+			return
+		await frames(1.0 / 30.0)
+
+
+## advance until the player has walked past world z = `z` (course runs -z)
+func wait_z(z: float, timeout := 4.0) -> void:
+	for i in int(timeout * 30.0):
+		if pc.global_position.z <= z:
 			return
 		await frames(1.0 / 30.0)
 
@@ -358,8 +368,12 @@ func _run() -> void:
 		await closeup("stairs_up_feet", Vector3(2.0, 0.3, 0.0), 0.3)
 		await frames(0.25); await shot("stairs_up_side_b")
 		await closeup("stairs_up_feet_b", Vector3(2.0, 0.3, 0.0), 0.3)
-		await frames(1.6); await shot("stairs_down_side")
-		await closeup("stairs_down_feet", Vector3(2.0, 0.3, 0.0), 0.3)
+		# down flight starts at z = STAIR_Z0 - 10 treads - landing depth
+		var down_z0: float = L.STAIR_Z0 - L.STAIR_TREAD * L.STAIR_STEPS - L.STAIR_LANDING_DEPTH
+		await wait_z(down_z0 - 0.75); await shot("stairs_down_side")
+		await closeup("stairs_down_feet", Vector3(2.0, 0.3, 0.0), 0.0)
+		await wait_z(down_z0 - 1.5)
+		await closeup("stairs_down_feet_b", Vector3(2.0, 0.3, 0.0), 0.0)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.4)
 
