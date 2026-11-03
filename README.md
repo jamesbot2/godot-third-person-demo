@@ -96,7 +96,7 @@ done
 # 输出：RESULT|PASS/FAIL|名称|细节 、METRIC|名称|值 、SUMMARY|hz|pass|fail
 ```
 
-当前结果（见 `tests/results/`）：30/60/120 Hz 均 102/102（core 模式，仓库默认；原 86 项 + Round 3 新增 6 项瞄准方向移动 + 2 项起停 + 2 项原地转身 + Round 4 新增 3 项：翻越/攀爬单帧跳变、180° 急转腿部间距、后退步态 + Round 5 新增 2 项：攀爬起身手臂、推箱子帧率无关 + Round 6 新增 1 项：推箱子时迈步而不是站着滑行）。本机 extras 模式（不随仓库发布）为 99/102：extras 自带的后退片段、翻越/攀爬片段和攀爬起身手臂没有通过（`headless_*hz_local_extras.txt`）。
+当前结果（见 `tests/results/`）：30/60/120 Hz 均 107/107（core 模式，仓库默认；原 86 项 + Round 3 新增 6 项瞄准方向移动 + 2 项起停 + 2 项原地转身 + Round 4 新增 3 项：翻越/攀爬单帧跳变、180° 急转腿部间距、后退步态 + Round 5 新增 2 项：攀爬起身手臂、推箱子帧率无关 + Round 6 新增 1 项：推箱子时迈步而不是站着滑行 + Round 7 新增 5 项：后退→瞄准前进切换不下蹲、左右侧移手臂、推箱子双手扶箱、推箱子前倾）。本机 extras 模式（不随仓库发布）为 105/107：extras 自带的翻越/攀爬片段和攀爬起身手臂没有通过（`headless_*hz_local_extras.txt`）。
 
 动画模式：仓库只含 CC0 Standard 片段（core 模式，翻越/攀爬为程序化拼接）。真实翻越/攀爬/转身片段来自第三方 Drawcall Market 转发的
 Quaternius 付费级内容，许可证**存疑**，不提交；可在本机运行 `tools/fetch_drawcall.sh` + `tools/retarget_drawcall.gd --build`
@@ -134,6 +134,6 @@ scripts/camera/camera_rig.gd          第三人称相机架
 scripts/level/course_layout.gd        测试场尺寸常量（测试与关卡共用）
 scripts/level/graybox_course.gd       测试场生成
 scripts/hud.gd                        HUD
-tests/run_tests.gd                    自动化测试（102 项）
+tests/run_tests.gd                    自动化测试（107 项）
 tools/showcase.gd                     可视化自动驾驶展示 + 截图
 ```
