@@ -104,7 +104,7 @@ func _run() -> void:
 	var tests := ["t_accel", "t_reverse", "t_turn", "t_steps", "t_step_down", "t_stairs", "t_ramps",
 		"t_slope_rest", "t_jump", "t_coyote", "t_buffer", "t_air_control", "t_corridors", "t_wall",
 		"t_tunnel", "t_slide", "t_roll", "t_vault", "t_mantle", "t_tall_wall", "t_landing",
-		"t_crates", "t_camera", "t_fuzz"]
+		"t_crates", "t_camera", "t_fuzz", "t_anim"]
 	for t in tests:
 		if want(t):
 			await call(t)
@@ -846,3 +846,144 @@ func t_fuzz() -> void:
 	check("fuzz_no_launch", max_vy < 6.0, "max vy=%.2f %s" % [max_vy, issues])
 	check("fuzz_no_fall_through", min_y > -0.05, "min y=%.3f" % min_y)
 	check("fuzz_no_stuck_action_state", max_run_s < 4.5, "longest SLIDE/ROLL/TRAVERSE run=%.2fs" % max_run_s)
+
+
+# ------------------------------------------------------------ animation ---
+## Skeletal presentation layer: tree active, no T-pose, state mapping,
+## speed-matched playback (planted-foot slip), feet on the floor.
+var _anim: Node
+var _sk: Skeleton3D
+
+
+func _bone_world(n: String) -> Vector3:
+	return (_sk.global_transform * _sk.get_bone_global_pose(_sk.find_bone(n))).origin
+
+
+func _not_tpose() -> bool:
+	# A/T-pose = arms straight out: hands ~1.4 m apart at shoulder height.
+	var hl := _bone_world("hand_l")
+	var hr := _bone_world("hand_r")
+	var sh := _bone_world("upperarm_l")
+	return hl.distance_to(hr) < 1.25 and minf(hl.y, hr.y) < sh.y - 0.15
+
+
+func _wait_anim(st: String, timeout: float) -> bool:
+	for n in secs(timeout):
+		await tick()
+		if _anim.anim_state == st:
+			return true
+	return false
+
+
+func t_anim() -> void:
+	_anim = pc.get_node("Model")
+	_sk = _anim.skeleton if _anim else null
+	var tree: AnimationTree = _anim.anim_tree if _anim else null
+	check("anim_setup", _sk != null and _sk.get_bone_count() == 65 and tree != null and tree.active and _anim.anim_player.has_animation("jog"),
+		"bones=%d active=%s" % [_sk.get_bone_count() if _sk else -1, tree.active if tree else false])
+	# idle
+	await place(Vector3(0, 0.02, 4))
+	await tick(secs(0.6))
+	var d: Dictionary = _anim.get_anim_debug()
+	var foot_y := minf(_bone_world("ball_l").y, _bone_world("ball_r").y) - pc.global_position.y
+	metric("anim_idle_foot_y", foot_y)
+	check("anim_idle", d["anim_state"] == "ground" and d["sm_node"] == "ground" and _not_tpose() and absf(foot_y) < 0.04,
+		"state=%s node=%s foot_y=%.3f tpose=%s" % [d["anim_state"], d["sm_node"], foot_y, not _not_tpose()])
+	# steady locomotion: planted-foot slip in world space
+	for spec in [["walk", 1.8], ["jog", 4.2], ["sprint", 6.8]]:
+		await place(Vector3(4, 0.02, 20))
+		press("move_forward")
+		if spec[0] == "walk":
+			press("walk_toggle"); await tick(); release("walk_toggle")
+		if spec[0] == "sprint":
+			press("sprint")
+		await tick(secs(1.4))
+		var prev := {}
+		var slips: Array[float] = []
+		var fwd_slip := 0.0
+		var tpose_ok := true
+		var min_fy := INF
+		for n in secs(1.2):
+			await tick()
+			var floor_y := pc.global_position.y
+			var lo := ""
+			var lo_y := INF
+			for b in ["ball_l", "ball_r"]:
+				var p := _bone_world(b)
+				if p.y < lo_y:
+					lo_y = p.y
+					lo = b
+			for b in ["ball_l", "ball_r"]:
+				var p := _bone_world(b)
+				if prev.has(b) and b == lo and p.y - floor_y < 0.035:
+					slips.append(Vector2(p.x - prev[b].x, p.z - prev[b].z).length() * hz)
+					fwd_slip += -(p.z - prev[b].z) * hz
+				prev[b] = p
+			min_fy = minf(min_fy, lo_y - floor_y)
+			if not _not_tpose():
+				tpose_ok = false
+		slips.sort()
+		var med := slips[slips.size() / 2] if slips.size() > 0 else -1.0
+		d = _anim.get_anim_debug()
+		metric("anim_%s_slip_med" % spec[0], med)
+		metric("anim_%s_min_foot_y" % spec[0], min_fy)
+		metric("anim_%s_slip_drift" % spec[0], fwd_slip / maxf(slips.size(), 1))
+		var fwd_mean := fwd_slip / maxf(slips.size(), 1)
+		# Guard: planted foot speed stays a small fraction of body speed and
+		# has no systematic drift (playback rate matches ground speed).
+		check("anim_%s" % spec[0], d["anim_state"] == "ground" and tpose_ok and slips.size() > 10 and med < 0.25 * spec[1] + 0.2 and absf(fwd_mean) < 0.35 and min_fy > -0.05 and min_fy < 0.05,
+			"v=%.2f gait=%.2f style=%.2f rate=%.2f slip_med=%.2fm/s drift=%.2fm/s n=%d min_foot_y=%.3f" % [pc.get_horizontal_speed(), d["gait"], d["run_style"], d["cycle_rate"], med, fwd_mean, slips.size(), min_fy])
+		release_all()
+		if spec[0] == "walk":
+			press("walk_toggle"); await tick(); release("walk_toggle")
+	# jump -> air -> land
+	await place(Vector3(0, 0.02, 4))
+	press("jump"); await tick(); release("jump")
+	await tick(2)
+	var saw_jump: bool = _anim.anim_state == "jump"
+	var saw_air := await _wait_anim("air", 1.0)
+	var saw_ground := await _wait_anim("ground", 2.0)
+	await tick(2)
+	var lw: float = _anim.land_weight
+	check("anim_jump_air_land", saw_jump and saw_air and saw_ground and lw > 0.05, "jump=%s air=%s ground=%s land_w=%.2f" % [saw_jump, saw_air, saw_ground, lw])
+	# slide
+	await place(Vector3(4, 0.02, 20))
+	press("move_forward"); press("sprint")
+	await tick(secs(1.5))
+	press("crouch_toggle"); await tick(); release("crouch_toggle")
+	var saw_slide := await _wait_anim("slide", 0.3)
+	await tick(secs(0.4))
+	var pelvis_low := _bone_world("pelvis").y - pc.global_position.y
+	release_all()
+	await tick(secs(1.5))
+	check("anim_slide", saw_slide and pelvis_low < 0.5, "slide=%s pelvis_h=%.2f" % [saw_slide, pelvis_low])
+	# roll: pose comes from the clip, the Model node itself never rotates off-axis
+	await place(Vector3(-4, 0.02, 20))
+	press("move_forward")
+	await tick(secs(0.8))
+	press("roll"); await tick(); release("roll")
+	var saw_roll := await _wait_anim("roll", 0.2)
+	var max_tilt := 0.0
+	var min_head := INF
+	for n in secs(0.6):
+		await tick()
+		max_tilt = maxf(max_tilt, absf(_anim.rotation.x) + absf(_anim.rotation.z))
+		min_head = minf(min_head, _bone_world("Head").y - pc.global_position.y)
+	release_all()
+	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9, "roll=%s model_tilt=%.3f min_head_h=%.2f" % [saw_roll, max_tilt, min_head])
+	# vault + mantle map to their own states
+	await place(Vector3(L.VAULT_X, 0.02, L.VAULT_Z + 3.0))
+	press("move_forward")
+	await walk_until_z(L.VAULT_Z + 1.0, 2.0)
+	press("jump")
+	var saw_vault := await _wait_anim("vault", 1.0)
+	release_all()
+	await tick(secs(1.0))
+	await place(Vector3(L.MANTLE_X, 0.02, L.MANTLE_Z + 1.0))
+	press("move_forward")
+	await tick(secs(0.4))
+	press("jump")
+	var saw_mantle := await _wait_anim("mantle", 1.0)
+	release_all()
+	await tick(secs(0.8))
+	check("anim_traverse_states", saw_vault and saw_mantle and _anim.anim_state == "ground", "vault=%s mantle=%s end=%s" % [saw_vault, saw_mantle, _anim.anim_state])
