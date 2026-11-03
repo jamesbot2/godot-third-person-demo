@@ -66,4 +66,7 @@ Round 3 前期（提交 `9e0060c`）把 Drawcall Market（https://market.drawcal
 Round 4 新增的派生片段（`roll_tuck`、`walk_bwd`/`jog_bwd`/`sprint_bwd`，见 `scripts/player/roll_authoring.gd`、
 `scripts/player/backward_gait.gd`）只在运行时、在内存中由已提交的 CC0 Standard 片段计算出来，没有引入新的第三方数据，也不读取 extras。
 
+Round 5 新增的瞄准移动片段（`aim_fwd`/`aim_bwd` 与 6 个侧移/斜向交叉步片段，见 `scripts/player/strafe_gait.gd`）同样是派生数据：
+运行时在内存中由已提交的 CC0 Standard 走/慢跑片段（及其派生的后退片段）计算（相位对齐混合 + 双骨 IK 重定向），不入库、不引入新的第三方数据。
+
 Standard 包（UBC、UAL1 Standard、UAL2 Standard）的结论不变：CC0，直接从作者的 itch.io 页面以 $0 获得。

@@ -104,6 +104,7 @@
 - 状态：`ground`（idle/walk/jog/sprint 混合 + 蹲混合）、`air`（jump_start→jump_air / 下落用 ninja_air 收腿）、`slide`、`roll`、`vault`、`mantle`。过渡带 xfade（0.08–0.2 s），不跳帧。
 - 步态：`_solve_gait(v)` 在实测步幅表（`tools/calibrate_stride.gd` 测出的每个片段每周期前进距离）上插值，`cycle_rate = v / stride`，所有循环片段相位同步（Blend2 + 统一 TimeScale），切换档位时脚不换相。
 - 起步/停步/转身/侧移/后退：**CC0 包里没有专门片段**。用加速度驱动的前倾（atan(a/g)·0.55，−9°…+10°）、刹车后仰、按向心加速度的侧倾（≤14°）、按局部移动方向的下肢扭转（warp）来表现；后退时循环反向播放。
+  瞄准移动（Round 5）：`StrafeGait` 在加载时生成 8 方向片段（前/后为 CC0 片段相位对齐混合，侧移和 4 个斜向为双骨 IK 重定向的交叉步），放进 BlendSpace2D，按方向插值步幅推进相位，瞄准时不再使用 warp（`AIM_WARP=1` 恢复旧路径做 A/B）。
 - 跳跃：jump_start（预备）→ jump_air（上升/滞空）→ 下落按 vy（−0.5…−5 m/s）混入 jump_land 第 0 帧（伸腿准备着地）→ jump_land，落地权重 = 落地严重度（软/中/重），重落地追加骨盆下沉与恢复时间。
 - 滑铲：Slide_Start → Slide → Slide_Exit，seek 到 `slide_time` 对应位置；蹲起与控制器胶囊高度同步。
 - 翻滚：Roll 片段从 `ROLL_T0 = 0.36 s`（跳过片段开头的水平飞扑段）起，按 `roll_time / roll_duration` seek，模型本身不做任何旋转（测试 `anim_roll` 断言 model_tilt = 0）。
