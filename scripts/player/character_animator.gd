@@ -62,6 +62,13 @@ static func _add_authored(lib: AnimationLibrary) -> void:
 		# ROLL_UNTUCKED=1: A/B measurement against the raw source clip
 		var raw := OS.get_environment("ROLL_UNTUCKED") == "1"
 		lib.add_animation("roll_tuck", lib.get_animation("roll").duplicate() if raw else RollAuthoring.build(lib.get_animation("roll")))
+	# backward gait (see backward_gait.gd); BWD_RAW=1: plain time-reversed
+	# clips for A/B measurement
+	var bwd_raw := OS.get_environment("BWD_RAW") == "1"
+	for c in ["walk", "jog", "sprint"]:
+		if not lib.has_animation(c + "_bwd"):
+			var src := lib.get_animation(c)
+			lib.add_animation(c + "_bwd", BackwardGait.reversed(src) if bwd_raw else BackwardGait.build(src, c))
 
 
 const BodyPoseModifierScript := preload("res://scripts/player/body_pose_modifier.gd")
@@ -155,6 +162,7 @@ var _vis_y := 0.0
 var _vel_s := Vector3.ZERO
 var _acc_s := Vector3.ZERO
 var _backward := false
+var _bwd_s := 0.0   # smoothed weight of the authored backward gait
 var _land_t := 99.0
 var _land_peak := 0.0
 var _land_rate := 1.0
@@ -395,7 +403,16 @@ func _build_tree() -> AnimationNodeStateMachine:
 	var s := _scaled(g, "sprint", "sprint", Vector2(0, 450))
 	var run := _blend2(g, "run", j, s, Vector2(500, 350), true)
 	var gaitn := _blend2(g, "gait", w, run, Vector2(700, 200), true)
-	var move := _blend2(g, "move", "idle", gaitn, Vector2(900, 100))
+	# authored backward gait, played forward while backpedalling; its clip
+	# time stays the mirror (L - t) of the forward branch so the dir blend
+	# never mixes mismatched phases
+	var wb := _scaled(g, "walk_b", "walk_bwd", Vector2(0, -450))
+	var jb := _scaled(g, "jog_b", "jog_bwd", Vector2(0, -300))
+	var sb := _scaled(g, "sprint_b", "sprint_bwd", Vector2(0, -150))
+	var runb := _blend2(g, "run_b", jb, sb, Vector2(500, -250), true)
+	var gaitb := _blend2(g, "gait_b", wb, runb, Vector2(700, -300), true)
+	var dirn := _blend2(g, "dir", gaitn, gaitb, Vector2(800, 0), true)
+	var move := _blend2(g, "move", "idle", dirn, Vector2(900, 100))
 	g.add_node("cidle", _anim("crouch_idle"), Vector2(0, 600))
 	var cw := _scaled(g, "cwalk", "crouch_walk", Vector2(0, 750))
 	var cmove := _blend2(g, "cmove", "cidle", cw, Vector2(500, 650))
@@ -637,8 +654,15 @@ func _drive_ground(dt: float) -> void:
 	_p("ground/walk_ts/scale", LEN_WALK * cycle_rate)
 	_p("ground/jog_ts/scale", LEN_JOG * cycle_rate)
 	_p("ground/sprint_ts/scale", LEN_SPRINT * cycle_rate)
+	_p("ground/walk_b_ts/scale", -LEN_WALK * cycle_rate)
+	_p("ground/jog_b_ts/scale", -LEN_JOG * cycle_rate)
+	_p("ground/sprint_b_ts/scale", -LEN_SPRINT * cycle_rate)
 	_p("ground/run/blend_amount", run_style)
 	_p("ground/gait/blend_amount", gait)
+	_p("ground/run_b/blend_amount", run_style)
+	_p("ground/gait_b/blend_amount", gait)
+	_bwd_s = lerpf(_bwd_s, 1.0 if _backward else 0.0, 1.0 - exp(-14.0 * dt))
+	_p("ground/dir/blend_amount", _bwd_s)
 	_p("ground/move/blend_amount", _move_s)
 	var c_rate := v / stride_cwalk * (-1.0 if _backward else 1.0)
 	_p("ground/cwalk_ts/scale", LEN_CWALK * c_rate)

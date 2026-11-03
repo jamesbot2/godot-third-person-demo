@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 98
+const EXPECTED_TOTAL := 99
 
 
 func want(name: String) -> bool:
@@ -1243,6 +1243,7 @@ func t_anim() -> void:
 			var max_leg := 0.0
 			var tp_ok := true
 			var vs := 0.0
+			var knee_lead := 0.0   # swing knee ahead of the hips along the legs' heading
 			var n_s := secs(1.2)
 			for n in n_s:
 				var was_cd: Array = fk.cooldown.duplicate()
@@ -1275,6 +1276,11 @@ func t_anim() -> void:
 					var e := absf(wrapf(mv_yaw - leg_yaw, -PI, PI))
 					e = minf(e, PI - e)
 					max_leg = maxf(max_leg, rad_to_deg(e))
+					var lf := Vector3(-sin(leg_yaw), 0, -cos(leg_yaw))
+					var pel := _bone_world("pelvis")
+					for sd in ["l", "r"]:
+						if _bone_world("ball_" + sd).y - floor_y > 0.08:
+							knee_lead = maxf(knee_lead, (_bone_world("calf_" + sd) - pel).dot(lf))
 				vs += hv.length() / n_s
 				if not _not_tpose():
 					tp_ok = false
@@ -1292,11 +1298,19 @@ func t_anim() -> void:
 				res["face"] = max_face
 				res["leg"] = max_leg
 				res["tp"] = tp_ok
+				res["knee_lead"] = knee_lead
 		_anim.foot_ik_enabled = true
 		metric("anim_%s_clip_slip_med" % spec[0], res["fk_med"])
 		metric("anim_%s_slip_med" % spec[0], res["ik_med"])
 		metric("anim_%s_lock_pops" % spec[0], res["pops"])
 		metric("anim_%s_leg_err_deg" % spec[0], res["leg"])
+		metric("anim_%s_swing_knee_lead_m" % spec[0], res["knee_lead"])
+		if spec[0] == "backpedal":
+			# authored backward gait (BackwardGait): damped reversed knee drive.
+			# The plain reversed forward clip measures 0.36 m here (BWD_RAW=1);
+			# the authored clip 0.29-0.31 m. Modest gate: it catches a
+			# regression to the raw clip, not a full redesign.
+			check("anim_backpedal_gait", res["knee_lead"] < 0.33, "max swing knee lead ahead of hips=%.2f m (raw reversed forward clip 0.36)" % res["knee_lead"])
 		check("anim_%s" % spec[0], res["tp"] and res["ik_n"] > secs(0.3) and res["ik_med"] < 0.1 * res["v"] and absf(res["ik_drift"]) < 0.15 * res["v"] and res["pops"] == 0 and res["face"] < 10.0 and res["leg"] < 25.0,
 			"v=%.2f IK on: slip med=%.3f m/s (%.0f%% of v) p90=%.2f drift=%.2f pops=%d face_err=%.1fdeg leg_err=%.0fdeg n=%d | IK off: clip slip med=%.2f (%.0f%%) drift=%.2f" % [res["v"], res["ik_med"], 100.0 * res["ik_med"] / maxf(res["v"], 0.01), res["ik_p90"], res["ik_drift"], res["pops"], res["face"], res["leg"], res["ik_n"], res["fk_med"], 100.0 * res["fk_med"] / maxf(res["v"], 0.01), res["fk_drift"]])
 	# jump -> air -> land
