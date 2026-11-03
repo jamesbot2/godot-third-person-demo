@@ -75,19 +75,35 @@ const SWAY := 2.0
 ## 0.32 (jog-like stance fraction): the long 0.42 stance swept the feet
 ## +-0.59 m and the reach-keeping pelvis drop sank aimed forward to 0.67 m
 ## (plain forward gait 0.80 m) -- the "crouched" look; now ~0.77 m
-const FB_DUTY := 0.32
+static var FB_DUTY := _envf("FB_DUTY", 0.28)
+## Round 8: FB_DUTY 0.32 -> 0.28 and FB_SKEW_F 0.7 -> 0.5 (earlier, lower
+## late swing): aimed-forward swing knee lead 0.375 -> 0.35 m (raw CC0
+## forward blend 0.366), widest stance 0.90 -> 0.81 m, pelvis 0.77 -> 0.79 m
 const FB_DUTY_B := 0.38
-const FB_LIFT_F := 0.16
+static var FB_LIFT_F := _envf("FB_LIFT_F", 0.16)
 const FB_LIFT_B := 0.08
 const FB_NARROW := 0.75
-const FB_C_F := 0.0
+static var FB_C_F := _envf("FB_C_F", 0.0)
 const FB_C_B := 0.0
 ## swing end tangents vs the stance velocity (less overshoot than strafe)
 const FB_TAN := 0.35
+## round 8: forward diagonals (aim_diag_fl / fr) get their own stance
+## fraction / lift / width / swing tangents: with the strafe DUTY 0.42 the
+## 2.0 m diagonal stride swept the feet 0.84 m per stance -> 1.24 m widest
+## stance and the reach-keeping pelvis drop sank them to 0.75 m (aim_fwd:
+## 0.90 m / 0.77 m after its round 7 duty change)
+static var FD_DUTY := _envf("FD_DUTY", 0.28)
+static var FD_LIFT := _envf("FD_LIFT", 0.12)
+static var FD_NARROW := _envf("FD_NARROW", 0.4)
+static var FD_TAN := _envf("FD_TAN", 0.35)
+
+
+static func _envf(k: String, d: float) -> float:
+	return float(OS.get_environment(k)) if OS.has_environment(k) else d
 ## swing lift timing (peak at s = 0.5^(1/skew)): the forward swing lifts
 ## early (heel recovery behind the body), the backpedal swing late (the foot
 ## stays low while it is in front, lifts behind)
-const FB_SKEW_F := 0.7
+static var FB_SKEW_F := _envf("FB_SKEW_F", 0.5)
 const FB_SKEW_B := 2.5
 
 
@@ -413,4 +429,5 @@ static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: floa
 		if back:
 			lib.add_animation(nm, to_anim(skel, dir_frames(skel, bwd, idle_loc, dv, st, unit, BD_DUTY, BD_LIFT, NARROW, 0.0, SIDE_TAN, true, BD_SKEW), walk))
 		else:
-			lib.add_animation(nm, to_anim(skel, dir_frames(skel, fwd, idle_loc, dv, st, unit, DUTY, LIFT, NARROW, 0.0, SIDE_TAN), walk))
+			var diag := absf(v2.y) > 0.01
+			lib.add_animation(nm, to_anim(skel, dir_frames(skel, fwd, idle_loc, dv, st, unit, FD_DUTY if diag else DUTY, FD_LIFT if diag else LIFT, FD_NARROW if diag else NARROW, 0.0, FD_TAN if diag else SIDE_TAN), walk))

@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 110
+const EXPECTED_TOTAL := 112
 
 
 func want(name: String) -> bool:
@@ -1526,6 +1526,7 @@ func t_anim() -> void:
 			res[key + "p90"] = slips[int(slips.size() * 0.9)] if slips.size() > 0 else -1.0
 			res[key + "drift"] = drift / maxf(slips.size(), 1)
 			res[key + "n"] = slips.size()
+			res[key + "knee"] = knee_lead
 			if pass_ik:
 				res["v"] = vs
 				res["pops"] = pops
@@ -1563,6 +1564,7 @@ func t_anim() -> void:
 		metric("anim_%s_lock_pops" % spec[0], res["pops"])
 		metric("anim_%s_leg_err_deg" % spec[0], res["leg"])
 		metric("anim_%s_swing_knee_lead_m" % spec[0], res["knee_lead"])
+		metric("anim_%s_swing_knee_lead_ik_off_m" % spec[0], res["fk_knee"])
 		if res.has("cadence"):
 			metric("anim_%s_cadence_spm" % spec[0], res["cadence"])
 		if spec[0] == "backpedal":
@@ -1574,6 +1576,15 @@ func t_anim() -> void:
 			# was still in FRONT of the hips (IK-off clip: ~0.14 m); the arc is
 			# scaled down while backpedalling -> ~0.25 m. Gate 0.30 m.
 			check("anim_backpedal_gait", res["knee_lead"] < 0.30, "max swing knee lead ahead of hips=%.2f m (raw reversed forward clip 0.36)" % res["knee_lead"])
+		if spec[0] == "aim_fwd" and _anim.has_aim_set:
+			# round 8: the re-posed aimed forward gait must not throw the swing
+			# knee further ahead of the hips than the raw CC0 walk/jog blend
+			# (AIM_FB_RAW=1: 0.366 m); round 7 measured 0.375 m
+			check("anim_aim_fwd_knee_lead", res["knee_lead"] < 0.36, "max swing knee lead ahead of hips=%.3f m (raw CC0 forward blend 0.366, round 7 0.375)" % res["knee_lead"])
+		if spec[0] == "diag_fl" and _anim.has_aim_set:
+			# round 8: forward diagonal posture like the aimed forward gait
+			# (round 7: pelvis 0.75 m, widest stance 1.24 m)
+			check("anim_diag_fl_posture", res.get("pel_min", 0.0) >= 0.78 and res["wide"] < 1.0, "pelvis min=%.3f m (want >=0.78) widest stance=%.2f m (want <1.0)" % [res.get("pel_min", 0.0), res["wide"]])
 		var aim_set: bool = _anim.has_aim_set
 		var authored: bool = aim_set and spec[0] in ["aim_fwd", "strafe_left", "strafe_right", "backpedal", "diag_fl", "diag_br"]
 		var is_strafe: bool = spec[0] in ["strafe_left", "strafe_right"]
