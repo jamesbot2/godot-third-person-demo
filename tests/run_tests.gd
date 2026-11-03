@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 105
+const EXPECTED_TOTAL := 107
 
 
 func want(name: String) -> bool:
@@ -817,19 +817,42 @@ func t_crates() -> void:
 	var heavy: RigidBody3D = main.get_node("Props/Crate5")
 	var lp0 := light.global_position
 	await place(lp0 + Vector3(0, 0.02 - lp0.y, 2.0))
+	await tick(secs(0.3))
+	var am: Node = pc.get_node("Model")
+	var torso0: Vector3 = am.get_final_bone_world("neck_01") - am.get_final_bone_world("pelvis")
+	var lean_idle := rad_to_deg(atan2(-torso0.z, torso0.y))   # facing -Z
 	press("move_forward")
 	var max_y := 0.0
 	var max_vy := 0.0
 	var max_tilt := 0.0
-	var am: Node = pc.get_node("Model")
 	var push_n := 0
 	var push_anim := 0.0
 	var push_vel := 0.0
 	var push_disp := 0.0
+	var hand_err := 0.0
+	var hand_n := 0
+	var gap_lo := INF     # wrist height above the drawn crate top
+	var gap_hi := -INF
+	var lean_sum := 0.0
 	for n in secs(2.0):
 		var pp := pc.global_position
 		await tick()
+		var torso: Vector3 = am.get_final_bone_world("neck_01") - am.get_final_bone_world("pelvis")
+		var fwd_h := Vector3(light.global_position.x - pc.global_position.x, 0, light.global_position.z - pc.global_position.z).normalized()
+		var lean := rad_to_deg(atan2(torso.dot(fwd_h), torso.y))
 		if pc.is_pushing and n > secs(1.2):
+			# Round 7: hands on the crate (wrist on its IK target) + lean
+			if float(am.push_w) > 0.99:
+				hand_n += 1
+				var ctop := light.get_global_transform_interpolated().origin.y + 0.4
+				for i in 2:
+					var hw: Vector3 = am.get_final_bone_world("hand_l" if i == 0 else "hand_r")
+					hand_err = maxf(hand_err, hw.distance_to(am.push_hand_t[i]))
+					gap_lo = minf(gap_lo, hw.y - ctop)
+					gap_hi = maxf(gap_hi, hw.y - ctop)
+			lean_sum += lean
+			if OS.has_environment("PUSH_DEBUG"):
+				print("PUSHDBG lean=%.1f w=%.2f sh-t=%.3f,%.3f err=%.3f,%.3f" % [lean, am.push_w, am.get_final_bone_world("upperarm_l").distance_to(am.push_hand_t[0]), am.get_final_bone_world("upperarm_r").distance_to(am.push_hand_t[1]), am.get_final_bone_world("hand_l").distance_to(am.push_hand_t[0]), am.get_final_bone_world("hand_r").distance_to(am.push_hand_t[1])])
 			push_n += 1
 			push_anim += float(am.p_speed)
 			push_vel += Vector2(pc.velocity.x, pc.velocity.z).length()
@@ -852,6 +875,13 @@ func t_crates() -> void:
 	metric("crate_push_anim_speed", push_anim / pn)
 	metric("crate_push_body_speed", push_disp / pn)
 	metric("crate_push_clipped_vel", push_vel / pn)
+	metric("crate_push_hand_err_m", hand_err)
+	metric("crate_push_lean_deg", lean_sum / pn)
+	metric("crate_idle_lean_deg", lean_idle)
+	metric("crate_push_wrist_over_top_min_m", gap_lo)
+	metric("crate_push_wrist_over_top_max_m", gap_hi)
+	check("crate_push_hands_on_crate", hand_n > push_n / 2 and hand_err < 0.04 and gap_lo > 0.0 and gap_hi < 0.08, "hands-on ticks=%d/%d max wrist-target err=%.3fm wrist over crate top %.3f..%.3fm" % [hand_n, push_n, hand_err, gap_lo, gap_hi])
+	check("crate_push_leans", lean_sum / pn > lean_idle + 12.0, "torso lean pushing=%.1f deg, standing=%.1f deg" % [lean_sum / pn, lean_idle])
 	check("crate_push_anim_walks", push_n > 5 and absf(push_anim / pn - push_disp / pn) < 0.35 and push_anim / pn > 1.2, "pushing ticks=%d anim speed=%.2f body speed=%.2f (clipped velocity %.2f)" % [push_n, push_anim / pn, push_disp / pn, push_vel / pn])
 	var hp0 := heavy.global_position
 	await place(hp0 + Vector3(0, 0.02 - hp0.y, 2.0))

@@ -179,6 +179,11 @@ var step_count := 0
 ## animator reads `move_velocity` instead (otherwise: idle pose sliding).
 var move_velocity := Vector3.ZERO
 var is_pushing := false
+## Round 7: the pushed prop and its contact (world point + normal pointing
+## back at the player) of the last tick, for the animator's hands-on-crate IK.
+var push_body: RigidBody3D = null
+var push_point := Vector3.ZERO
+var push_normal := Vector3.ZERO
 var sim_time := 0.0
 var current_height := 1.8
 var accel_world := Vector3.ZERO
@@ -275,6 +280,7 @@ func get_camera_yaw() -> float:
 func _physics_process(dt: float) -> void:
 	sim_time += dt
 	is_pushing = false
+	push_body = null
 	var e := _gather_input(dt)
 	slide_cooldown = maxf(slide_cooldown - dt, 0.0)
 	slide_boost_timer = maxf(slide_boost_timer - dt, 0.0)
@@ -963,6 +969,10 @@ func _push_props(intended_hv: Vector3, dt: float) -> void:
 		push_dir = push_dir.normalized()
 		if intended_hv.dot(push_dir) > 0.1:
 			is_pushing = true
+			if push_body == null:
+				push_body = rb
+				push_point = c.get_position()
+				push_normal = -push_dir
 		# Velocity servo with a force budget (Round 5). The old version
 		# applied a saturated 450 N impulse at centre height; the crate's
 		# response then depended on the tick rate (3.45/3.40/2.31 m at

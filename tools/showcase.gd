@@ -502,7 +502,11 @@ func _run() -> void:
 		await frames(0.55); await shot("crate_contact")
 		await closeup("crate_push_contact", Vector3(1.4, 1.3, 0.5), 0.7, 40.0)
 		await frames(0.5); await shot("crate_push")
-		await closeup("crate_push_side", Vector3(1.6, 1.2, -0.2), 0.7, 40.0)
+		# Round 7: the side close-up waits until the pushed crate has slid
+		# past its neighbours (x +-1.5 at the start line) -- from the start
+		# line the camera sat behind Crate3 and only its face was in frame
+		await frames(0.8)
+		await closeup("crate_push_side", Vector3(1.8, 1.1, 0.0), 0.75, 42.0)
 		await closeup("crate_push_feet", Vector3(1.2, 0.9, 0.9), -0.5, 38.0, true)
 		var line := "CRATE|moved=%.2fm player=%s crate=%s" % [crate.global_position.distance_to(c0), pc.global_position, crate.global_position]
 		print(line)
