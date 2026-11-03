@@ -77,8 +77,6 @@ METRIC|roll_dist_m|2.8040
 RESULT|PASS|roll|dur=0.600s dist=2.80m end=GROUND
 RESULT|PASS|roll_cooldown|state=GROUND
 RESULT|PASS|roll_from_idle|state=ROLL
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|vault_0.9|saw=true z=-9.77 y=0.001 max_y=0.96 state=GROUND
 RESULT|PASS|vault_sprint|v_in=6.80 saw=true z=-9.81 max_y=0.96
 RESULT|PASS|vault_needs_input|z=-5.60 state=GROUND
@@ -92,6 +90,8 @@ RESULT|PASS|crate_push_light|crate moved=3.40m player max_y=0.001 max_vy=0.00
 RESULT|PASS|crate_heavy_resists|heavy moved=0.00m
 RESULT|PASS|camera_never_inside_geometry|inside=0 / 600 samples
 RESULT|PASS|camera_idle_stable|max drift=0.00001
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|fuzz_no_nan|
 RESULT|PASS|fuzz_no_launch|max vy=4.54 []
 RESULT|PASS|fuzz_no_fall_through|min y=0.000
@@ -120,11 +120,19 @@ RESULT|PASS|anim_startstop_walk|lock breaks start=0 stop=0  planted slip med=0.0
 METRIC|anim_startstop_jog_breaks|0.0000
 METRIC|anim_startstop_jog_slip_p90|0.1091
 RESULT|PASS|anim_startstop_jog|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.11 m/s n=89
+METRIC|anim_turn90_breaks|0.0000
+METRIC|anim_turn90_steps|2.0000
+METRIC|anim_turn90_time_s|0.1000
+RESULT|PASS|anim_turn_inplace_90|t=0.10s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=206 end offset=0.010 m
+METRIC|anim_turn180_breaks|0.0000
+METRIC|anim_turn180_steps|2.0000
+METRIC|anim_turn180_time_s|0.2000
+RESULT|PASS|anim_turn_inplace_180|t=0.20s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=206 end offset=0.020 m
 METRIC|anim_stairs_foot_pen|0.0003
 METRIC|anim_stairs_foot_gap_med|0.0000
-METRIC|anim_stairs_foot_gap_p90|0.0287
+METRIC|anim_stairs_foot_gap_p90|0.0285
 RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.029 m  max penetration=0.000 m  n=390 max_y=1.80
-METRIC|anim_ramp20_foot_pen|0.0010
+METRIC|anim_ramp20_foot_pen|0.0006
 METRIC|anim_ramp20_foot_gap_med|0.0069
 METRIC|anim_ramp20_foot_gap_p90|0.0505
 RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.007 m p90=0.051 m  max penetration=0.001 m  n=300 max_y=1.01
@@ -164,4 +172,4 @@ RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.12
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.030 m  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=19 (0.32 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=60|pass=94|fail=0
+SUMMARY|hz=60|pass=96|fail=0

@@ -93,7 +93,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 94
+const EXPECTED_TOTAL := 96
 
 
 func want(name: String) -> bool:
@@ -603,11 +603,36 @@ func t_slide() -> void:
 	check("slide_into_tunnel_safe", ceiling_ok and pc.global_position.y < 0.05, "z=%.2f h=%.2f y=%.3f" % [pc.global_position.z, pc.current_height, pc.global_position.y])
 
 
+func _rollprobe(st: Dictionary, tag: String) -> void:
+	if _anim == null:
+		_anim = pc.get_node("Model")
+	var xf := pc.global_transform
+	var parts := []
+	for b in ["pelvis", "head", "ball_l", "ball_r", "hand_l", "hand_r"]:
+		var w := _bone_world(b)
+		var l := xf.affine_inverse() * w
+		var d: float = (l - (st[b] as Vector3)).length() if st.has(b) else 0.0
+		st[b] = l
+		parts.append("%s=%.3f" % [b, d])
+	var sole := minf(_bone_world("ball_l").y, _bone_world("ball_r").y) - 0.024 - pc.global_position.y
+	print("RP %s st=%s rt=%.3f sole=%.3f %s" % [tag, pc.get_state_name(), pc.roll_time, sole, " ".join(parts)])
+
+
 func t_roll() -> void:
 	await place(Vector3(-4, 0.02, 20))
 	press("move_forward")
 	await tick(secs(1.0))
+	var _rp := {}
+	if OS.has_environment("ROLLPROBE"):
+		for n0 in secs(0.15):
+			await tick()
+			_rollprobe(_rp, "pre")
 	press("roll"); await tick(); release("roll")
+	if OS.has_environment("ROLLPROBE"):
+		_rollprobe(_rp, "R")
+		for n0 in secs(0.7):
+			await tick()
+			_rollprobe(_rp, "R")
 	await tick()
 	var started := pc.state == PlayerController.State.ROLL
 	var z0 := pc.global_position.z
@@ -1072,6 +1097,50 @@ func t_anim() -> void:
 		metric("anim_startstop_%s_slip_p90" % spec[0], p90)
 		check("anim_startstop_%s" % spec[0], breaks[0] + breaks[1] == 0 and med < 0.05 and p90 < 0.5,
 			"lock breaks start=%d stop=%d  planted slip med=%.3f p90=%.2f m/s n=%d" % [breaks[0], breaks[1], med, p90, slips.size()])
+	# turn in place (aimed, standing): the camera swings 90 / 180 deg and the
+	# body follows at the aim turn rate. The feet must step around (settle
+	# steps), never visibly snap back (lock break), and planted balls must
+	# not skate; afterwards both feet are back near the idle pose (< 6 cm:
+	# offsets under the 5 cm settle threshold are kept on purpose, no micro-steps).
+	for spec in [["90", 90.0], ["180", 180.0]]:
+		await place(Vector3(4, 0.02, 20))
+		press("aim")
+		await tick(secs(0.6))
+		var fk = _anim.foot_ik
+		var breaks := 0
+		var prev := {}
+		var slips: Array[float] = []
+		var steps := 0
+		rig.yaw = wrapf(rig.yaw + deg_to_rad(spec[1]) * (1.0 if spec[1] < 179.0 else 0.999), -PI, PI)
+		var t_done := -1.0
+		for n in secs(2.0):
+			var was_cd: Array = fk.cooldown.duplicate()
+			var was_sh: Array = fk.swing_hold.duplicate()
+			await tick()
+			for k in 2:
+				if fk.cooldown[k] and not was_cd[k]:
+					breaks += 1
+				if fk.swing_hold[k] and not was_sh[k]:
+					steps += 1
+			if t_done < 0.0 and absf(wrapf(pc.facing_yaw - pc.get_camera_yaw(), -PI, PI)) < deg_to_rad(2.0):
+				t_done = float(n + 1) / hz
+			var floor_y := pc.global_position.y
+			for b in ["ball_l", "ball_r"]:
+				var bp := _bone_world(b)
+				var k := 0 if b == "ball_l" else 1
+				if prev.has(b) and fk.planted[k] and bp.y - floor_y < 0.035:
+					slips.append(Vector2(bp.x - prev[b].x, bp.z - prev[b].z).length() * hz)
+				prev[b] = bp
+		var off_end := maxf(Vector2(fk.offset[0].x, fk.offset[0].z).length(), Vector2(fk.offset[1].x, fk.offset[1].z).length())
+		release_all()
+		slips.sort()
+		var med: float = slips[slips.size() / 2] if slips.size() > 0 else 0.0
+		var p90: float = slips[int(slips.size() * 0.9)] if slips.size() > 0 else 0.0
+		metric("anim_turn%s_breaks" % spec[0], breaks)
+		metric("anim_turn%s_steps" % spec[0], steps)
+		metric("anim_turn%s_time_s" % spec[0], t_done)
+		check("anim_turn_inplace_%s" % spec[0], breaks == 0 and t_done > 0.0 and med < 0.05 and p90 < 0.3 and off_end < 0.06,
+			"t=%.2fs lock breaks=%d settle/swing steps=%d planted slip med=%.3f p90=%.2f m/s n=%d end offset=%.3f m" % [t_done, breaks, steps, med, p90, slips.size(), off_end])
 	# feet on uneven ground: stairs up/down and a 20 deg ramp up/down
 	for spec in [["stairs", Vector3(L.STAIR_X, 0.02, L.STAIR_Z0 + 1.5), 6.5], ["ramp20", Vector3(L.ramp_x(1), 0.02, L.RAMP_Z0 + 1.5), 5.0]]:
 		await place(spec[1])

@@ -32,14 +32,14 @@ METRIC|stairs_up_time_s|1.0250
 RESULT|PASS|stairs_up_no_jump|t_top=1.02s max_y=1.810 air_ticks=0 jumps=0
 METRIC|stairs_cam_max_dy_per_tick|0.0396
 RESULT|PASS|stairs_camera_smooth|max cam dy/tick=0.0396
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|stairs_down_grounded|y=0.000 ungrounded_ticks=0
 RESULT|PASS|steep_stairs_0.25|reached=true y=2.001 t=1.18s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_up_10|angle=10 reached=true y=1.500 t=2.88s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_down_10|y=0.000 ungrounded_ticks=0
 RESULT|PASS|ramp_up_20|angle=20 reached=true y=1.500 t=1.87s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_down_20|y=0.000 ungrounded_ticks=0
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|ramp_up_30|angle=30 reached=true y=1.500 t=1.55s max_vy=0.00 air_ticks=0
 RESULT|PASS|ramp_down_30|y=0.000 ungrounded_ticks=0
 RESULT|PASS|ramp_up_40|angle=40 reached=true y=1.500 t=1.41s max_vy=0.00 air_ticks=0
@@ -120,6 +120,14 @@ RESULT|PASS|anim_startstop_walk|lock breaks start=0 stop=0  planted slip med=0.0
 METRIC|anim_startstop_jog_breaks|0.0000
 METRIC|anim_startstop_jog_slip_p90|0.0412
 RESULT|PASS|anim_startstop_jog|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.04 m/s n=176
+METRIC|anim_turn90_breaks|0.0000
+METRIC|anim_turn90_steps|2.0000
+METRIC|anim_turn90_time_s|0.1000
+RESULT|PASS|anim_turn_inplace_90|t=0.10s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=416 end offset=0.011 m
+METRIC|anim_turn180_breaks|0.0000
+METRIC|anim_turn180_steps|2.0000
+METRIC|anim_turn180_time_s|0.2000
+RESULT|PASS|anim_turn_inplace_180|t=0.20s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=415 end offset=0.021 m
 METRIC|anim_stairs_foot_pen|0.0000
 METRIC|anim_stairs_foot_gap_med|0.0000
 METRIC|anim_stairs_foot_gap_p90|0.0474
@@ -164,4 +172,4 @@ RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.05
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.026 m  planted wrist err=0.000 m  hand penetration=0.001 m  max sole penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=52 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=120|pass=94|fail=0
+SUMMARY|hz=120|pass=96|fail=0

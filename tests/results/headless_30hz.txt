@@ -118,19 +118,29 @@ RESULT|PASS|anim_startstop_walk|lock breaks start=0 stop=0  planted slip med=0.0
 METRIC|anim_startstop_jog_breaks|0.0000
 METRIC|anim_startstop_jog_slip_p90|0.1681
 RESULT|PASS|anim_startstop_jog|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.17 m/s n=46
+METRIC|anim_turn90_breaks|0.0000
+METRIC|anim_turn90_steps|2.0000
+METRIC|anim_turn90_time_s|0.1000
+RESULT|PASS|anim_turn_inplace_90|t=0.10s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=104 end offset=0.009 m
+METRIC|anim_turn180_breaks|0.0000
+METRIC|anim_turn180_steps|2.0000
+METRIC|anim_turn180_time_s|0.2000
+RESULT|PASS|anim_turn_inplace_180|t=0.20s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=106 end offset=0.042 m
 METRIC|anim_stairs_foot_pen|0.0000
 METRIC|anim_stairs_foot_gap_med|0.0000
-METRIC|anim_stairs_foot_gap_p90|0.0269
+METRIC|anim_stairs_foot_gap_p90|0.0267
 RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.027 m  max penetration=0.000 m  n=196 max_y=1.80
-METRIC|anim_ramp20_foot_pen|0.0042
-METRIC|anim_ramp20_foot_gap_med|0.0082
-METRIC|anim_ramp20_foot_gap_p90|0.0467
-RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.008 m p90=0.047 m  max penetration=0.004 m  n=150 max_y=1.02
+METRIC|anim_ramp20_foot_pen|0.0041
+METRIC|anim_ramp20_foot_gap_med|0.0081
+METRIC|anim_ramp20_foot_gap_p90|0.0463
+RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.008 m p90=0.046 m  max penetration=0.004 m  n=150 max_y=1.02
 METRIC|anim_aim_fwd_clip_slip_med|0.8576
 METRIC|anim_aim_fwd_slip_med|0.0000
 METRIC|anim_aim_fwd_lock_pops|0.0000
 METRIC|anim_aim_fwd_leg_err_deg|0.0000
 RESULT|PASS|anim_aim_fwd|v=3.00 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=-0.00 pops=0 face_err=0.0deg leg_err=0deg n=21 | IK off: clip slip med=0.86 (29%) drift=-0.10
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 METRIC|anim_strafe_left_clip_slip_med|0.9875
 METRIC|anim_strafe_left_slip_med|0.0000
 METRIC|anim_strafe_left_lock_pops|0.0000
@@ -162,4 +172,4 @@ RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.13
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.030 m  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=12 (0.40 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=30|pass=94|fail=0
+SUMMARY|hz=30|pass=96|fail=0

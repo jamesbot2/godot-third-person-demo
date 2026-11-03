@@ -40,6 +40,11 @@ var weight := 0.0
 var lock_enabled := true
 var max_lock_offset := 0.24
 var max_lock_yaw := 0.6
+## standing turn (turn in place): a pinned foot whose body has yawed this far
+## steps around (settle step with lift arc) instead of breaking; the feet step
+## one at a time unless the twist reaches max_lock_yaw_stand
+var turn_step_yaw := 0.45
+var max_lock_yaw_stand := 1.2
 ## a pinned foot left this far below the body (stairs: the clip stride spans
 ## two treads) is released and steps up instead of crouching the pelvis
 var max_lock_drop := 0.34
@@ -195,14 +200,15 @@ func _process_modification() -> void:
 			elif _root_v >= 0.35 and absf(ground_s[i]) < 0.05 and o.length() > swing_min_offset and (_clip_v[i] > swing_thr or hc > PLANT_H):
 				planted[i] = false
 				swing_hold[i] = true
-			elif _root_v < 0.35 and (o.length() > 0.2 or (o.length() > 0.05 and _clip_v[i] < 0.3)):
+			elif _root_v < 0.35 and (o.length() > 0.2 or (o.length() > 0.05 and _clip_v[i] < 0.3) \
+					or (yaw_d > turn_step_yaw and not swing_hold[1 - i]) or yaw_d > max_lock_yaw_stand):
 				# standing still: keep the foot pinned while the clip blends
 				# into idle, then re-place it with a small procedural step
 				# (lifted arc) instead of skating it across the floor
 				planted[i] = false
 				swing_hold[i] = true
 				settle[i] = true
-			elif o.length() > max_lock_offset or yaw_d > max_lock_yaw or ground_s[i] < -max_lock_drop:
+			elif o.length() > max_lock_offset or (yaw_d > max_lock_yaw and _root_v >= 0.35) or ground_s[i] < -max_lock_drop:
 				planted[i] = false
 				cooldown[i] = true
 				if OS.has_environment("FOOTIK_DEBUG"):
