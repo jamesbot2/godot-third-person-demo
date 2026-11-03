@@ -4,51 +4,51 @@ INFO|anim_library=core (CC0 Standard clips only)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 WARNING: AnimationNodeBlendSpace2D::add_blend_point: No name provided, using safe index as reference. In the future, empty names will be deprecated, so explicitly passing a name is recommended.
      at: add_blend_point (scene/animation/animation_blend_space_2d.cpp:74)
      GDScript backtrace (most recent call first):
-         [0] _aim_branch (res://scripts/player/character_animator.gd:461)
-         [1] _build_tree (res://scripts/player/character_animator.gd:493)
-         [2] _ready (res://scripts/player/character_animator.gd:288)
+         [0] _aim_branch (res://scripts/player/character_animator.gd:478)
+         [1] _build_tree (res://scripts/player/character_animator.gd:510)
+         [2] _ready (res://scripts/player/character_animator.gd:305)
 INFO|physics_hz=30 engine=4.7.2-stable (official)
 METRIC|jog_t90_s|0.2000
 RESULT|PASS|accel_jog_t90|t90=0.200s (expect ~0.17)
@@ -139,17 +139,38 @@ RESULT|PASS|crate_push_rate_independent|crate moved=3.13m (want 3.12+-0.15) max 
 METRIC|crate_push_anim_speed|1.9830
 METRIC|crate_push_body_speed|1.9935
 METRIC|crate_push_clipped_vel|1.6420
-METRIC|crate_push_hand_err_m|0.0027
-METRIC|crate_push_lean_deg|34.1223
+METRIC|crate_push_hand_err_m|0.0162
+METRIC|crate_push_lean_deg|47.9440
 METRIC|crate_idle_lean_deg|9.2487
 METRIC|crate_push_wrist_over_top_min_m|0.0300
-METRIC|crate_push_wrist_over_top_max_m|0.0325
-RESULT|PASS|crate_push_hands_on_crate|hands-on ticks=23/23 max wrist-target err=0.003m wrist over crate top 0.030..0.033m
-RESULT|PASS|crate_push_leans|torso lean pushing=34.1 deg, standing=9.2 deg
+METRIC|crate_push_wrist_over_top_max_m|0.0424
+RESULT|PASS|crate_push_hands_on_crate|hands-on ticks=23/23 max wrist-target err=0.016m wrist over crate top 0.030..0.042m
+METRIC|crate_push_knee_clear_min_m|0.2083
+METRIC|crate_push_trail_knee_flex_deg|62.2865
+METRIC|crate_push_elbow_deg|128.8802
+RESULT|PASS|crate_push_pose|min knee/toe clearance from crate face=0.208m (want >0.03) trailing knee flex=62.3 deg (want >18) elbow=128.9 deg (want 115..170)
+RESULT|PASS|crate_push_leans|torso lean pushing=47.9 deg, standing=9.2 deg
 RESULT|PASS|crate_push_anim_walks|pushing ticks=23 anim speed=1.98 body speed=1.99 (clipped velocity 1.64)
 RESULT|PASS|crate_heavy_resists|heavy moved=0.00m
+METRIC|crate_tall_heavy_hands_ticks|30.0000
+METRIC|crate_tall_heavy_wrist_h_min_m|1.0791
+METRIC|crate_tall_heavy_wrist_h_max_m|1.0877
+METRIC|crate_tall_heavy_wrist_face_max_m|0.0572
+METRIC|crate_tall_heavy_wrist_err_m|0.0192
+METRIC|crate_tall_stack_hands_ticks|30.0000
+METRIC|crate_tall_stack_wrist_h_min_m|1.2199
+METRIC|crate_tall_stack_wrist_h_max_m|1.2201
+METRIC|crate_tall_stack_wrist_face_max_m|0.0400
+METRIC|crate_tall_stack_wrist_err_m|0.0000
+METRIC|crate_tall_heavy_face_plane_err_m|0.0000
+METRIC|crate_stack_moved_m|2.6382
+METRIC|crate_stack_top_offset_m|0.0115
+RESULT|PASS|crate_tall_hands_on_face|heavy: ticks=30 wrist h=1.08..1.09m face gap max=0.057m err=0.019m | stack: ticks=30 wrist h=1.22..1.22m face gap max=0.040m err=0.000m (want h 1.0..1.4, gap -0.02..0.08, err<0.04)
+RESULT|PASS|crate_stack_pushes|stack moved=2.64m top crate offset=0.01m h=0.80m
 RESULT|PASS|camera_never_inside_geometry|inside=0 / 300 samples
 RESULT|PASS|camera_idle_stable|max drift=0.00001
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|fuzz_no_nan|
 RESULT|PASS|fuzz_no_launch|max vy=4.67 []
 RESULT|PASS|fuzz_no_fall_through|min y=0.000
@@ -167,16 +188,16 @@ METRIC|anim_jog_slip_med|0.0000
 METRIC|anim_jog_min_foot_y|0.0231
 METRIC|anim_jog_slip_drift|0.0000
 RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=16 min_foot_y=0.023
-METRIC|anim_sprint_slip_p90|1.4936
+METRIC|anim_sprint_slip_p90|1.4497
 METRIC|anim_sprint_slip_med|0.0000
 METRIC|anim_sprint_min_foot_y|0.0231
-METRIC|anim_sprint_slip_drift|0.3499
-RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=1.49m/s drift=0.35m/s n=12 min_foot_y=0.023
+METRIC|anim_sprint_slip_drift|0.3441
+RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=1.45m/s drift=0.34m/s n=12 min_foot_y=0.023
 METRIC|anim_startstop_walk_breaks|0.0000
-METRIC|anim_startstop_walk_slip_p90|0.0435
-RESULT|PASS|anim_startstop_walk|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.04 m/s n=57
+METRIC|anim_startstop_walk_slip_p90|0.0495
+RESULT|PASS|anim_startstop_walk|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.05 m/s n=58
 METRIC|anim_startstop_jog_breaks|0.0000
-METRIC|anim_startstop_jog_slip_p90|0.1681
+METRIC|anim_startstop_jog_slip_p90|0.1682
 RESULT|PASS|anim_startstop_jog|lock breaks start=0 stop=0  planted slip med=0.000 p90=0.17 m/s n=46
 METRIC|anim_turn90_breaks|0.0000
 METRIC|anim_turn90_steps|2.0000
@@ -188,117 +209,125 @@ METRIC|anim_turn180_time_s|0.2000
 RESULT|PASS|anim_turn_inplace_180|t=0.20s lock breaks=0 settle/swing steps=2 planted slip med=0.000 p90=0.00 m/s n=106 end offset=0.042 m
 METRIC|anim_stairs_foot_pen|0.0000
 METRIC|anim_stairs_foot_gap_med|0.0000
-METRIC|anim_stairs_foot_gap_p90|0.0266
-RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.027 m  max penetration=0.000 m  n=196 max_y=1.80
+METRIC|anim_stairs_foot_gap_p90|0.0262
+RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.026 m  max penetration=0.000 m  n=196 max_y=1.80
 METRIC|anim_ramp20_foot_pen|0.0041
-METRIC|anim_ramp20_foot_gap_med|0.0081
-METRIC|anim_ramp20_foot_gap_p90|0.0463
+METRIC|anim_ramp20_foot_gap_med|0.0078
+METRIC|anim_ramp20_foot_gap_p90|0.0462
 RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.008 m p90=0.046 m  max penetration=0.004 m  n=150 max_y=1.02
-METRIC|anim_aim_fwd_clip_slip_med|0.0024
+METRIC|anim_aim_fwd_clip_slip_med|0.0039
 METRIC|anim_aim_fwd_slip_med|0.0000
 METRIC|anim_aim_fwd_lock_pops|0.0000
 METRIC|anim_aim_fwd_leg_err_deg|0.0000
-METRIC|anim_aim_fwd_swing_knee_lead_m|0.3748
+METRIC|anim_aim_fwd_swing_knee_lead_m|0.3519
+METRIC|anim_aim_fwd_swing_knee_lead_ik_off_m|0.3509
 METRIC|anim_aim_fwd_cadence_spm|144.0000
+RESULT|PASS|anim_aim_fwd_knee_lead|max swing knee lead ahead of hips=0.352 m (raw CC0 forward blend 0.366, round 7 0.375)
 METRIC|anim_aim_fwd_warp_deg|0.0000
-METRIC|anim_aim_fwd_stance_max_m|0.8956
-METRIC|anim_aim_fwd_pelvis_min_m|0.7708
-METRIC|anim_aim_fwd_hand_fore_aft_range_m|0.2642
-METRIC|anim_aim_fwd_hand_side_range_m|0.0444
-METRIC|anim_aim_fwd_hip_chest_twist_deg|34.6776
-METRIC|anim_aim_fwd_hip_yaw_range_deg|2.4358
-METRIC|anim_aim_fwd_chest_yaw_range_deg|36.8738
+METRIC|anim_aim_fwd_stance_max_m|0.7908
+METRIC|anim_aim_fwd_pelvis_min_m|0.7869
+METRIC|anim_aim_fwd_hand_fore_aft_range_m|0.2638
+METRIC|anim_aim_fwd_hand_side_range_m|0.0448
+METRIC|anim_aim_fwd_hip_chest_twist_deg|34.5374
+METRIC|anim_aim_fwd_hip_yaw_range_deg|2.4336
+METRIC|anim_aim_fwd_chest_yaw_range_deg|36.8099
 METRIC|anim_aim_fwd_step_asym|0.0800
-RESULT|PASS|anim_aim_fwd|aim-set v=3.00 IK on: slip med=0.000 m/s (0% of v) p90=2.46 drift=0.32 pops=0 face_err=0.0deg leg_err=0deg warp=0.0deg cross=0.79m widest=0.90m n=25 | IK off: clip slip med=0.00 (0%, gated) drift=0.32
-METRIC|anim_strafe_left_clip_slip_med|0.0015
+RESULT|PASS|anim_aim_fwd|aim-set v=3.00 IK on: slip med=0.000 m/s (0% of v) p90=0.01 drift=0.24 pops=0 face_err=0.0deg leg_err=0deg warp=0.0deg cross=0.70m widest=0.79m n=22 | IK off: clip slip med=0.00 (0%, gated) drift=0.39
+METRIC|anim_strafe_left_clip_slip_med|0.0012
 METRIC|anim_strafe_left_slip_med|0.0000
 METRIC|anim_strafe_left_lock_pops|0.0000
 METRIC|anim_strafe_left_leg_err_deg|90.0000
-METRIC|anim_strafe_left_swing_knee_lead_m|0.2921
+METRIC|anim_strafe_left_swing_knee_lead_m|0.2896
+METRIC|anim_strafe_left_swing_knee_lead_ik_off_m|0.2953
 METRIC|anim_strafe_left_cadence_spm|248.2759
 METRIC|anim_strafe_left_warp_deg|0.0000
-METRIC|anim_strafe_left_cross_m|0.3992
-METRIC|anim_strafe_left_stance_max_m|0.9338
-METRIC|anim_strafe_left_pelvis_min_m|0.8169
-METRIC|anim_strafe_left_hand_fore_aft_range_m|0.1161
-METRIC|anim_strafe_left_hand_side_range_m|0.1506
-RESULT|PASS|anim_strafe_left_arms|hand swing fore-aft 0.116 m (aim_fwd 0.264), sideways 0.151 m (aim_fwd 0.044)
-METRIC|anim_strafe_left_hip_chest_twist_deg|48.7552
-METRIC|anim_strafe_left_hip_yaw_range_deg|11.7074
-METRIC|anim_strafe_left_chest_yaw_range_deg|37.0477
+METRIC|anim_strafe_left_cross_m|0.4109
+METRIC|anim_strafe_left_stance_max_m|0.9006
+METRIC|anim_strafe_left_pelvis_min_m|0.8167
+METRIC|anim_strafe_left_hand_fore_aft_range_m|0.1174
+METRIC|anim_strafe_left_hand_side_range_m|0.1501
+RESULT|PASS|anim_strafe_left_arms|hand swing fore-aft 0.117 m (aim_fwd 0.264), sideways 0.150 m (aim_fwd 0.045)
+METRIC|anim_strafe_left_hip_chest_twist_deg|48.6028
+METRIC|anim_strafe_left_hip_yaw_range_deg|11.7026
+METRIC|anim_strafe_left_chest_yaw_range_deg|36.9001
 METRIC|anim_strafe_left_step_asym|0.0690
-RESULT|PASS|anim_strafe_left|aim-set v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=1.04 drift=0.19 pops=0 face_err=0.0deg leg_err=90deg warp=0.0deg cross=0.40m widest=0.93m n=34 | IK off: clip slip med=0.00 (0%, gated) drift=0.24
-METRIC|anim_strafe_right_clip_slip_med|0.0015
+RESULT|PASS|anim_strafe_left|aim-set v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=1.22 drift=0.21 pops=0 face_err=0.0deg leg_err=90deg warp=0.0deg cross=0.41m widest=0.90m n=34 | IK off: clip slip med=0.00 (0%, gated) drift=0.19
+METRIC|anim_strafe_right_clip_slip_med|0.0011
 METRIC|anim_strafe_right_slip_med|0.0000
 METRIC|anim_strafe_right_lock_pops|0.0000
 METRIC|anim_strafe_right_leg_err_deg|90.0000
-METRIC|anim_strafe_right_swing_knee_lead_m|0.3481
-METRIC|anim_strafe_right_cadence_spm|248.2759
+METRIC|anim_strafe_right_swing_knee_lead_m|0.3474
+METRIC|anim_strafe_right_swing_knee_lead_ik_off_m|0.3488
+METRIC|anim_strafe_right_cadence_spm|245.4545
 METRIC|anim_strafe_right_warp_deg|0.0000
-METRIC|anim_strafe_right_cross_m|0.4036
-METRIC|anim_strafe_right_stance_max_m|0.9070
-METRIC|anim_strafe_right_pelvis_min_m|0.8009
-METRIC|anim_strafe_right_hand_fore_aft_range_m|0.1171
-METRIC|anim_strafe_right_hand_side_range_m|0.1510
-RESULT|PASS|anim_strafe_right_arms|hand swing fore-aft 0.117 m (aim_fwd 0.264), sideways 0.151 m (aim_fwd 0.044)
-METRIC|anim_strafe_right_hip_chest_twist_deg|48.7296
-METRIC|anim_strafe_right_hip_yaw_range_deg|11.7079
-METRIC|anim_strafe_right_chest_yaw_range_deg|37.0217
+METRIC|anim_strafe_right_cross_m|0.4110
+METRIC|anim_strafe_right_stance_max_m|0.9007
+METRIC|anim_strafe_right_pelvis_min_m|0.8023
+METRIC|anim_strafe_right_hand_fore_aft_range_m|0.1167
+METRIC|anim_strafe_right_hand_side_range_m|0.1511
+RESULT|PASS|anim_strafe_right_arms|hand swing fore-aft 0.117 m (aim_fwd 0.264), sideways 0.151 m (aim_fwd 0.045)
+METRIC|anim_strafe_right_hip_chest_twist_deg|48.7748
+METRIC|anim_strafe_right_hip_yaw_range_deg|11.7007
+METRIC|anim_strafe_right_chest_yaw_range_deg|37.0837
 METRIC|anim_strafe_right_step_asym|0.0690
-RESULT|PASS|anim_strafe_right|aim-set v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=1.06 drift=0.21 pops=0 face_err=0.0deg leg_err=90deg warp=0.0deg cross=0.40m widest=0.91m n=34 | IK off: clip slip med=0.00 (0%, gated) drift=0.26
+RESULT|PASS|anim_strafe_right|aim-set v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=1.24 drift=0.21 pops=0 face_err=0.0deg leg_err=90deg warp=0.0deg cross=0.41m widest=0.90m n=34 | IK off: clip slip med=0.00 (0%, gated) drift=0.19
 METRIC|anim_backpedal_clip_slip_med|0.0011
 METRIC|anim_backpedal_slip_med|0.0000
 METRIC|anim_backpedal_lock_pops|0.0000
 METRIC|anim_backpedal_leg_err_deg|0.0000
-METRIC|anim_backpedal_swing_knee_lead_m|0.2439
+METRIC|anim_backpedal_swing_knee_lead_m|0.2387
+METRIC|anim_backpedal_swing_knee_lead_ik_off_m|0.1289
 METRIC|anim_backpedal_cadence_spm|150.0000
 RESULT|PASS|anim_backpedal_gait|max swing knee lead ahead of hips=0.24 m (raw reversed forward clip 0.36)
 METRIC|anim_backpedal_warp_deg|0.0000
-METRIC|anim_backpedal_stance_max_m|0.8195
-METRIC|anim_backpedal_pelvis_min_m|0.8077
-METRIC|anim_backpedal_hand_fore_aft_range_m|0.2659
-METRIC|anim_backpedal_hand_side_range_m|0.0438
-METRIC|anim_backpedal_hip_chest_twist_deg|28.3730
-METRIC|anim_backpedal_hip_yaw_range_deg|2.8443
-METRIC|anim_backpedal_chest_yaw_range_deg|31.0092
+METRIC|anim_backpedal_stance_max_m|0.8420
+METRIC|anim_backpedal_pelvis_min_m|0.8073
+METRIC|anim_backpedal_hand_fore_aft_range_m|0.2662
+METRIC|anim_backpedal_hand_side_range_m|0.0435
+METRIC|anim_backpedal_hip_chest_twist_deg|28.4390
+METRIC|anim_backpedal_hip_yaw_range_deg|2.8481
+METRIC|anim_backpedal_chest_yaw_range_deg|31.1087
 METRIC|anim_backpedal_step_asym|0.0000
-RESULT|PASS|anim_backpedal|aim-set v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=1.61 drift=0.31 pops=0 face_err=0.0deg leg_err=0deg warp=0.0deg cross=0.77m widest=0.82m n=35 | IK off: clip slip med=0.00 (0%, gated) drift=0.54
-METRIC|anim_diag_fl_clip_slip_med|0.0024
+RESULT|PASS|anim_backpedal|aim-set v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=1.54 drift=0.31 pops=0 face_err=0.0deg leg_err=0deg warp=0.0deg cross=0.75m widest=0.84m n=35 | IK off: clip slip med=0.00 (0%, gated) drift=0.44
+METRIC|anim_diag_fl_clip_slip_med|0.0038
 METRIC|anim_diag_fl_slip_med|0.0000
 METRIC|anim_diag_fl_lock_pops|0.0000
 METRIC|anim_diag_fl_leg_err_deg|45.0000
-METRIC|anim_diag_fl_swing_knee_lead_m|0.3207
+METRIC|anim_diag_fl_swing_knee_lead_m|0.3161
+METRIC|anim_diag_fl_swing_knee_lead_ik_off_m|0.3162
 METRIC|anim_diag_fl_cadence_spm|180.0000
+RESULT|PASS|anim_diag_fl_posture|pelvis min=0.814 m (want >=0.78) widest stance=0.87 m (want <1.0)
 METRIC|anim_diag_fl_warp_deg|0.0000
-METRIC|anim_diag_fl_stance_max_m|1.2405
-METRIC|anim_diag_fl_pelvis_min_m|0.7584
-METRIC|anim_diag_fl_hand_fore_aft_range_m|0.1621
-METRIC|anim_diag_fl_hand_side_range_m|0.1161
-METRIC|anim_diag_fl_hip_chest_twist_deg|44.6892
-METRIC|anim_diag_fl_hip_yaw_range_deg|7.6275
-METRIC|anim_diag_fl_chest_yaw_range_deg|37.0618
+METRIC|anim_diag_fl_stance_max_m|0.8720
+METRIC|anim_diag_fl_pelvis_min_m|0.8143
+METRIC|anim_diag_fl_hand_fore_aft_range_m|0.1612
+METRIC|anim_diag_fl_hand_side_range_m|0.1160
+METRIC|anim_diag_fl_hip_chest_twist_deg|44.7198
+METRIC|anim_diag_fl_hip_yaw_range_deg|7.6373
+METRIC|anim_diag_fl_chest_yaw_range_deg|37.0825
 METRIC|anim_diag_fl_step_asym|0.0000
-RESULT|PASS|anim_diag_fl|aim-set v=2.91 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.18 pops=0 face_err=0.0deg leg_err=45deg warp=0.0deg cross=0.79m widest=1.24m n=34 | IK off: clip slip med=0.00 (0%, gated) drift=0.17
-METRIC|anim_diag_br_clip_slip_med|0.0006
+RESULT|PASS|anim_diag_fl|aim-set v=2.91 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.20 pops=0 face_err=0.0deg leg_err=45deg warp=0.0deg cross=0.43m widest=0.87m n=24 | IK off: clip slip med=0.00 (0%, gated) drift=0.42
+METRIC|anim_diag_br_clip_slip_med|0.0007
 METRIC|anim_diag_br_slip_med|0.0000
 METRIC|anim_diag_br_lock_pops|0.0000
 METRIC|anim_diag_br_leg_err_deg|45.0000
-METRIC|anim_diag_br_swing_knee_lead_m|0.3400
+METRIC|anim_diag_br_swing_knee_lead_m|0.3382
+METRIC|anim_diag_br_swing_knee_lead_ik_off_m|0.2983
 METRIC|anim_diag_br_cadence_spm|186.2069
 METRIC|anim_diag_br_warp_deg|0.0000
-METRIC|anim_diag_br_stance_max_m|1.1495
-METRIC|anim_diag_br_pelvis_min_m|0.7870
-METRIC|anim_diag_br_hand_fore_aft_range_m|0.1575
-METRIC|anim_diag_br_hand_side_range_m|0.0758
-METRIC|anim_diag_br_hip_chest_twist_deg|38.3993
-METRIC|anim_diag_br_hip_yaw_range_deg|7.2343
-METRIC|anim_diag_br_chest_yaw_range_deg|31.1889
+METRIC|anim_diag_br_stance_max_m|1.1567
+METRIC|anim_diag_br_pelvis_min_m|0.7861
+METRIC|anim_diag_br_hand_fore_aft_range_m|0.1578
+METRIC|anim_diag_br_hand_side_range_m|0.0757
+METRIC|anim_diag_br_hip_chest_twist_deg|38.3175
+METRIC|anim_diag_br_hip_yaw_range_deg|7.2439
+METRIC|anim_diag_br_chest_yaw_range_deg|31.1185
 METRIC|anim_diag_br_step_asym|0.1053
-RESULT|PASS|anim_diag_br|aim-set v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.06 pops=0 face_err=0.0deg leg_err=45deg warp=0.0deg cross=0.36m widest=1.15m n=35 | IK off: clip slip med=0.00 (0%, gated) drift=0.16
-METRIC|anim_aim_switch_pelvis_min_m|0.7711
-METRIC|anim_aim_switch_pelvis_step_m|0.0134
-METRIC|anim_fwd_ref_pelvis_min_m|0.8052
-RESULT|PASS|anim_aim_switch_no_crouch|backpedal->aim forward: max pelvis step 0.013 m/frame(60Hz); pelvis min 0.771 m at +0.83s (v=3.0) vs plain forward gait min 0.805 m (v=4.2)
+RESULT|PASS|anim_diag_br|aim-set v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.06 pops=0 face_err=0.0deg leg_err=45deg warp=0.0deg cross=0.36m widest=1.16m n=35 | IK off: clip slip med=0.00 (0%, gated) drift=0.22
+METRIC|anim_aim_switch_pelvis_min_m|0.7851
+METRIC|anim_aim_switch_pelvis_step_m|0.0143
+METRIC|anim_fwd_ref_pelvis_min_m|0.8047
+RESULT|PASS|anim_aim_switch_no_crouch|backpedal->aim forward: max pelvis step 0.014 m/frame(60Hz); pelvis min 0.785 m at +1.13s (v=3.0) vs plain forward gait min 0.805 m (v=4.2)
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.40
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.06
 METRIC|anim_roll_float_max_m|0.0000
@@ -323,4 +352,4 @@ METRIC|anim_vault_pop_m|0.3194
 METRIC|anim_mantle_pop_m|0.2840
 RESULT|PASS|anim_traverse_pops|largest per-frame 2nd difference of body points: vault 0.319 m (calf_r, 9.6 m/s velocity jump)  mantle 0.284 m (hand_r, 8.5 m/s)
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=30|pass=107|fail=0
+SUMMARY|hz=30|pass=112|fail=0
