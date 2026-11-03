@@ -1,6 +1,8 @@
 # THIRD_PARTY — 参考来源与许可证
 
-本项目代码全部为独立编写。以下项目仅作为**思路参考**（阅读其方法与公开说明），未复制代码或资源。所有参考项目均为 MIT 许可证（2026-11-02 通过 GitHub API 核对）。
+本项目代码全部为独立编写。下方“代码/思路参考”中的项目仅作为**思路参考**（阅读其方法与公开说明），未复制代码或资源。所有参考项目均为 MIT 许可证（2026-11-02 通过 GitHub API 核对）。
+
+## 代码/思路参考
 
 | 来源 | 许可证 | 参考内容 |
 |---|---|---|
@@ -12,3 +14,25 @@
 | bearlikelion/SUCC (SurfsUp Character Controller) — https://github.com/bearlikelion/SUCC | MIT | 台阶/坡度处理与相机平滑的组织方式 |
 
 关于 ARC Raiders：只参考其公开可观察的移动表现（重量感、冲刺蓄速、翻越/攀爬的节奏），本项目不包含其任何代码、资源，也不声称了解其内部实现。
+
+## 美术资源（Round 2，已提交到仓库）
+
+| 资源 | 来源 URL | 许可证 | 仓库中的形式 |
+|---|---|---|---|
+| Universal Base Characters [Standard]（Quaternius）— 使用 `Superhero_Male_FullBody.gltf`（Godot - UE 版，65 骨 UE 命名骨架）| https://quaternius.itch.io/universal-base-characters （作者站 https://quaternius.com）| CC0 1.0（原文：`assets/licenses/Quaternius_UBC_License.txt`）| 构建产物 `assets/characters/ubc_male/ubc_male.scn` |
+| Universal Animation Library [Standard]（Quaternius）— `UAL1_Standard.glb` | https://quaternius.itch.io/universal-animation-library | CC0 1.0（`assets/licenses/Quaternius_UAL1_License.txt`）| `assets/animations/ual_clips.res` 中的片段 |
+| Universal Animation Library 2 [Standard]（Quaternius）— `UAL2_Standard.glb` | https://quaternius.itch.io/universal-animation-library-2 | CC0 1.0（`assets/licenses/Quaternius_UAL2_License.txt`）| 同上 |
+
+- 获取：三个包在 itch.io 上是“自愿付费，可 $0 下载”，`tools/fetch_quaternius.sh` 用 itch 的公开下载流程（csrf token → download_url）免登录下载，未付费。原始 zip/glb **未提交**（体积原因；许可证本身允许再分发）。
+- 构建：`tools/build_character_assets.gd` 读取原始 glTF/GLB，烘焙网格+骨架为 `.scn`，把使用的 19 个片段（Idle、Walk、Jog_Fwd、Sprint、Crouch_Idle、Crouch_Fwd、Jump_Start、Jump、Jump_Land、Roll、Push、A_TPose、Slide_Start、Slide、Slide_Exit、ClimbUp_1m、NinjaJump_Start/Idle/Land）写入 `.res`；只保留骨骼旋转和按身高比例缩放的盆骨位置，**丢弃根运动**；纹理用 `PortableCompressedTexture2D` 并设置 `keep_compressed_buffer = true`（否则保存为 .scn 后纹理丢失）。
+- 片段的使用方式见 MOVEMENT_SPEC §9。
+
+### 候选比较（如实）
+
+| 候选 | 结论 |
+|---|---|
+| Mixamo（Adobe）| **阻塞**：https://www.mixamo.com/ 需要 Adobe 账号登录，无法用 curl 获取；且其条款不允许把独立的角色/动画文件再分发到公开仓库。未使用、未提交任何 Mixamo 文件。 |
+| Quaternius UBC + UAL1/UAL2 | **采用**：CC0、写实比例的人形、标准 UE 骨架（角色和动画是同名同层级的 65 骨骨架；UBC 腿更长（盆骨静止高 0.949 vs 0.917 m），构建时只保留旋转并按腿长比例缩放盆骨轨道）、动画覆盖 idle/走/跑/冲刺/蹲/跳/落地/翻滚/滑铲/攀爬。 |
+| 旧的程序化灰盒人形（本仓库）| 被替换：方块肢体、程序化姿态，不满足“真人感”要求。 |
+
+已知资源缺口（CC0 Standard 包中没有，靠程序化补偿，见 MOVEMENT_SPEC §9）：专门的起步/停步/原地转身/侧移片段、真正的翻越（vault）片段、真正的攀上台沿（mantle）片段。翻越/攀爬是用 `ClimbUp_1m`（爬坡循环）+ `NinjaJump_Idle` 收腿姿态 + 手部 IK + 视觉根偏移拼出来的。

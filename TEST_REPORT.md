@@ -9,9 +9,9 @@
 ## 汇总
 
 ```
-SUMMARY|hz=30|pass=73|fail=0
-SUMMARY|hz=60|pass=73|fail=0
-SUMMARY|hz=120|pass=73|fail=0
+SUMMARY|hz=30|pass=84|fail=0
+SUMMARY|hz=60|pass=84|fail=0
+SUMMARY|hz=120|pass=84|fail=0
 ```
 
 ## 关键指标（三种物理频率）
@@ -123,10 +123,57 @@ SUMMARY|hz=120|pass=73|fail=0
 
 ## VISUAL ACCEPTANCE（可视化验收）
 
-- **headless 测试本身不构成视觉验收**：上面 73 项都是 headless 运行，VISUAL ACCEPTANCE: NOT VERIFIED（仅凭 headless）。
+- **headless 测试本身不构成视觉验收**：上面的用例都是 headless 运行，VISUAL ACCEPTANCE: NOT VERIFIED（仅凭 headless）。
 - 另外做了一次**真实非 headless 渲染**：`tools/showcase.gd` 自动驾驶，在 Xvfb 显示（DISPLAY=:6）上用 `--rendering-driver opengl3 --fixed-fps 30 --write-movie` 录制。
   渲染器为 **Mesa llvmpipe（软件光栅化，LLVM 19.1.7）**，所以 HUD 显示的墙钟 FPS 只有 17–24；Movie Maker 模式下游戏时间固定 30 fps，录像不受影响。
 - 产物：23 张 PNG 截图 + `showcase.mp4`（1280×720，30 fps，39.3 s）+ `shots.log`（每张截图对应的状态/位置/速度/相机距离/FOV 与状态切换日志）。
   产物不提交到仓库，存放于运行机的 `/workspace/acceptance/`。
 - 截图由开发者逐张查看过画面是否与日志状态一致；**最终手感验收需要仓库所有者本人确认**。
 
+
+
+## Round 2 — 骨骼角色动画测试（t_anim，11 项，2026-11-03）
+
+所有骨骼位置都取**最终渲染姿态**（含 BodyPoseModifier 前倾/扭转和 TwoBoneIK3D 手部 IK；在 `skeleton_updated` 时快照）。
+注意：f1b327c 时的 82/82 是在修改器之前的姿态上测的（当时不知道 Godot 4.7 的修改器结果只在骨骼更新内部有效）；本轮已改为最终姿态并全部重跑。
+
+| 用例 | 30 Hz | 60 Hz | 120 Hz | 判定条件 |
+|---|---|---|---|---|
+| anim_setup | PASS | PASS | PASS | 65 骨，AnimationTree active |
+| anim_idle | PASS foot_y 0.002 | PASS 0.001 | PASS 0.002 | 非 T-pose，脚贴地 ±5 cm |
+| anim_walk (1.8 m/s) | PASS slip_med 0.57 | PASS 0.56 | PASS 0.56 | 着地脚中位速度 < 0.25·v+0.2，无系统漂移 <0.35 m/s，脚高 ±5 cm |
+| anim_jog (4.2 m/s) | PASS 0.75 | PASS 0.79 | PASS 0.79 | 同上 |
+| anim_sprint (6.8 m/s) | PASS 1.02 | PASS 0.90 | PASS 1.12 | 同上 |
+| anim_jump_air_land | PASS | PASS | PASS | jump→air→ground 依次出现，落地权重 >0 |
+| anim_slide | PASS | PASS | PASS | 进入 slide 状态，骨盆贴近地面 |
+| anim_roll | PASS | PASS | PASS | 模型整体倾斜 = 0（不是机械旋转），头部最低 <0.9 m |
+| anim_vault_contact（新）| PASS hand 0.095 m / pen 0 | PASS 0.087 / 0 | PASS 0.086 / 0.009 | 手到墙顶最近 <0.12 m，脚穿入墙体 <0.04 m |
+| anim_mantle_contact（新）| PASS hand 0.045 m, 6 帧 / pen 0.035 | PASS 0.015, 11 帧 / 0.034 | PASS 0.007, 38 帧 / 0.035 | 手到台沿 <0.08 m 且持续 ≥0.15 s，脚穿入 <0.04 m |
+| anim_traverse_states | PASS | PASS | PASS | vault/mantle 状态映射正确，结束回 ground |
+
+如实说明：
+- **残留滑步**：着地脚中位水平速度为身体速度的 13–31%（walk 0.56 m/s、sprint 0.9–1.1 m/s）。阈值是本项目自定的“明显小于身体速度且无系统漂移”，并不代表零滑步；没有做脚部锁定 IK。
+- **手部接触时长与物理频率有关**：攀爬时手在台沿 8 cm 内的时长 30 Hz ≈0.2 s、60 Hz ≈0.18 s、120 Hz ≈0.32 s。其余时间手悬在台沿上方 3–13 cm（片段的身体上升比真实引体快，手臂已伸直够不到）。原因未完全确认。
+- **翻越手部**：最接近墙顶 8.6–9.5 cm，属于“接近”而不是严格贴合。
+- 脚趾/脚部穿入攀爬台前立面最多 3.5 cm。
+
+## Round 2 — 可视化验收（软件渲染）
+
+- 渲染：Xvfb DISPLAY=:17 + Mesa **llvmpipe（软件光栅化）**，`--rendering-driver opengl3 --fixed-fps 30 --resolution 1280x720 --write-movie`。**不是 GPU 渲染，不代表最终画面质量或实际帧率。**
+- 产物（运行机 `/workspace/acceptance/round2/`，不提交到仓库）：`showcase.mp4`（44.8 s，画面底部标注 SOFTWARE RENDERING）、`shots/` 46 张截图 + `shots.log`、`front.png` / `side.png` / `back.png`、`closeups/` 15 张、`contact_sheet.png`、`closeups_sheet.png`。
+- 逐项人工查看结论（只基于静态截图与缩略图，**不能替代真机动态观感**）：
+
+| 动作 | 结论 |
+|---|---|
+| idle（前/侧/背）| 视觉上合理：自然站姿，无 T-pose、无骨骼扭曲，脚在地面上。|
+| walk / jog / sprint | 截图中步态姿态合理、摆臂自然；动态滑步只能从数据判断（见上，残留 13–31%）。**动态未验收**。|
+| 刹车/停步 | 有后仰刹车姿态；没有专门停步片段。**动态未验收**。|
+| 90°/180° 转身、侧移、后退 | 截图距离太远，只能看出姿态未崩坏；侧移靠下肢扭转，没有专门片段。**未验收**。|
+| 起跳/空中/轻落地/重落地/恢复 | 缩略图尺寸下合理。**动态未验收**。|
+| 楼梯上下、30° 坡 | 缩略图下脚基本在台阶/坡面上，未见明显悬空。**未验收**（需近景动态）。|
+| 蹲、蹲走、滑铲 | 姿态正确（真实滑铲片段，背靠后、腿前伸）。|
+| 翻滚 | 用真实翻滚片段并按进度 seek，模型不做机械旋转；开头仍带一点前扑（头低腿高），之后抱团、起身，衔接自然。|
+| 翻越 0.9 m | 截图可见伸手向墙顶 → 低身越过墙顶 → 收腿过墙 → 落地；但相机角度下墙体遮挡较多，手是否“按”在墙顶看不清。**未验收**。|
+| 攀爬 1.5 m | 悬挂（双手在台沿、身体贴立面）→ 胸部趴上台沿 → 抬腿上台 → 站起走开，节奏可读；“趴上台沿”那一帧略像匍匐，且不是专门的 mantle 片段。**未验收**。|
+
+最终手感与观感需要仓库所有者在 MacBook Air M2（真实 GPU）上运行 `godot --path .` 人工确认；上表中标“未验收”的项目均视为 **NOT ACCEPTED**。

@@ -2,7 +2,7 @@
 
 Godot **4.7.2** / GDScript / Jolt Physics。目标是“物理可信 + 响应快 + 动作流畅”的第三人称移动手感
 （参考对象为 ARC Raiders 这类写实撤离射击游戏的**可观察**移动表现；本项目不包含、也不声称了解其任何专有代码、资源或内部实现）。
-场景和角色全部是程序化灰盒几何体，无外部美术资源。
+场景是程序化灰盒几何体；角色是 **Quaternius Universal Base Characters（CC0）** 的蒙皮人形 + **Universal Animation Library 1/2（CC0）** 骨骼动画（来源与构建见 [THIRD_PARTY.md](THIRD_PARTY.md)）。
 
 > 开发分支：`dev/movement-system`（`main` 保持为最初的稳定 demo）。
 > 文档：[MOVEMENT_SPEC.md](MOVEMENT_SPEC.md)（参数与公式） · [TEST_REPORT.md](TEST_REPORT.md)（真实测试输出） ·
@@ -15,7 +15,11 @@ Godot **4.7.2** / GDScript / Jolt Physics。目标是“物理可信 + 响应快
 - **地形**：StepSolver（`body_test_motion` 扫掠）上台阶 ≤0.40 m，0.50 m 拦截；下台阶/下楼梯贴地不腾空；坡度 ≤45°（+3° 接触容差）可走，50° 拒绝；陡坡不滑移；高速撞墙不穿透。
 - **动作**：蹲（切换/按住）、滑铲、翻滚、翻越（≤1.15 m 薄墙）、攀爬（≤1.6 m，含空中抓边）、落地分级（轻/中/重 + 翻滚卸力）。每个动作有明确的触发、取消、冷却。
 - **相机**：独立 top-level 相机架，球形碰撞拉近（不进墙）、平滑回弹、滚轮缩放、肩部偏移、冲刺/滑铲 FOV、落地下沉弹簧、蹲伏高度过渡、极近时隐藏模型。
-- **灰盒人形**：程序化姿态（走跑摆臂、蹲、滑铲、翻滚、翻越、攀爬、落地）。
+- **骨骼角色动画（Round 2）**：`CharacterAnimator` = Skeleton3D(65 骨) + AnimationPlayer + AnimationTree 状态机（ground/air/slide/roll/vault/mantle）。
+  地面为相位同步的 idle→walk→jog→sprint 混合，播放速率 = 速度/实测步幅（防滑步）；蹲/蹲走混合；起跳/滞空/落地按落地严重度加权；
+  滑铲与翻滚用真实动画片段并**按控制器进度 seek**（不是整体机械旋转）；翻越/攀爬按控制器轨迹进度 seek，并用 `TwoBoneIK3D` 把双手按到墙顶/台沿。
+  `BodyPoseModifier` 做加减速前倾、转弯侧倾、移动方向扭转、坡面骨盆下沉。物理控制器始终是唯一位移来源（动画的根运动被丢弃）。
+  旧的灰盒人形 `graybox_body.gd` 仍保留在仓库中但不再是正式角色。
 - **测试场**：台阶 0.15/0.25/0.35/0.40/0.50 m、0.18/0.30 楼梯、0.25 陡楼梯、10–50° 坡道、塔楼、窄走廊、低矮隧道、翻越墙/攀爬台/过高墙、轻/重可推箱子、相机碰撞区（柱子/顶棚/墙）。
 
 ## 操作
@@ -52,13 +56,19 @@ done
 # 输出：RESULT|PASS/FAIL|名称|细节 、METRIC|名称|值 、SUMMARY|hz|pass|fail
 ```
 
-当前结果（见 `tests/results/`）：30 Hz 73/73、60 Hz 73/73、120 Hz 73/73。
+当前结果（见 `tests/results/`）：30 Hz 84/84、60 Hz 84/84、120 Hz 84/84（含 11 项动画测试）。
 
 ```bash
 # 可视化展示（必须非 headless，需要 X 显示；录制 avi，再用 ffmpeg 转 mp4）
-DISPLAY=:7 godot --path . --rendering-driver opengl3 --fixed-fps 30 \
-  --write-movie /tmp/showcase.avi -s res://tools/showcase.gd -- --shots=/tmp/shots
+DISPLAY=:17 godot --path . --rendering-driver opengl3 --fixed-fps 30 \
+  --resolution 1280x720 --write-movie /tmp/showcase.avi -s res://tools/showcase.gd -- --shots=/tmp/shots
+# 只跑部分段落：-- --shots=/tmp/shots --only=roll,vault,mantle
 ffmpeg -i /tmp/showcase.avi -c:v libx264 -pix_fmt yuv420p showcase.mp4
+# 重新构建角色/动画资源（需先下载原始包，见 THIRD_PARTY.md）
+tools/fetch_quaternius.sh universal-base-characters /workspace/assets_raw/ubc
+tools/fetch_quaternius.sh universal-animation-library /workspace/assets_raw/ual1
+tools/fetch_quaternius.sh universal-animation-library-2 /workspace/assets_raw/ual2
+godot --headless -s res://tools/build_character_assets.gd -- --src=/workspace/assets_raw/
 ```
 
 ## 目录
@@ -68,11 +78,17 @@ scenes/main.tscn                 主场景（环境/灯光/测试场/箱子/玩�
 scenes/player.tscn               玩家（CharacterBody3D + 灰盒模型 + 相机架）
 scripts/player/player_controller.gd   运动状态机与全部运动学
 scripts/player/step_solver.gd         上台阶扫掠求解
-scripts/player/graybox_body.gd        程序化灰盒人形姿态
+scripts/player/character_animator.gd  骨骼角色：AnimationTree 状态机、步幅匹配、seek 动作、手部 IK、姿态修改器
+scripts/player/graybox_body.gd        旧灰盒人形（不再使用）
+assets/characters/ubc_male/           UBC 男性角色（CC0，构建产物）
+assets/animations/ual_clips.res       UAL1/2 动画片段（CC0，构建产物，根运动已去除）
+assets/licenses/                      原始许可证文本
+tools/build_character_assets.gd       资源构建（glTF→.scn/.res，重定向、去根运动、纹理）
+tools/fetch_quaternius.sh             从 itch.io 免登录下载 $0 包
 scripts/camera/camera_rig.gd          第三人称相机架
 scripts/level/course_layout.gd        测试场尺寸常量（测试与关卡共用）
 scripts/level/graybox_course.gd       测试场生成
 scripts/hud.gd                        HUD
-tests/run_tests.gd                    自动化测试（73 项）
+tests/run_tests.gd                    自动化测试（84 项）
 tools/showcase.gd                     可视化自动驾驶展示 + 截图
 ```

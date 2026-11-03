@@ -36,10 +36,33 @@
 - 观察：在 0.9 m 墙前约 2.4 m 就按跳，会是一次普通跳跃（0.9 m 跳高刚好越过 0.9 m 墙），而不是翻越动作；在约 1 m 处按跳则稳定触发 VAULT。记录为已知行为。
 - 自建的 Xvfb :7 在运行约 35–50 s 后被外部结束（原因不明），最终在已有的 DISPLAY=:6 上完成录制。
 
+## Cycle 4 — Round 2：骨骼角色替换（57f8c36, 910cc83, f1b327c）
+
+- 资源：Mixamo 需 Adobe 登录（https://www.mixamo.com/）且不允许再分发 → 阻塞，未用。改用 Quaternius UBC + UAL1/UAL2（CC0），`tools/fetch_quaternius.sh` 免登录 $0 下载，`tools/build_character_assets.gd` 构建（去根运动、盆骨按腿长缩放）。
+- `CharacterAnimator`：AnimationTree 状态机，相位同步、按实测步幅匹配速率的地面混合；seek 式一次性动作（滑铲/翻滚/翻越/攀爬按控制器进度）；`BodyPoseModifier` 做前倾/侧倾/扭转/骨盆下沉。
+- 新增 t_anim 测试，82/82 @30/60/120 Hz（当时在修改器前的姿态上测量，见 Cycle 5）。
+
+## Cycle 5 — 翻越/攀爬接触、翻滚、测量修正（2ba6b41 及之后）
+
+- 发现：Godot 4.7 的 `SkeletonModifier3D` 结果只在骨骼更新内部有效，别处 `get_bone_global_pose` 是修改器前的姿态 → 在 `skeleton_updated` 快照，测试改用 `get_final_bone_world()`。
+- `TwoBoneIK3D`（ArmIK）把双手按到墙顶/台沿，肘部极向量在后外下方；视觉根下压/前移 + 前倾，让身体与障碍物接触而不是“飘在旁边”。
+- 攀爬视觉根高度曲线调到 smoothstep(0.2,0.95)：更早(0.12,0.92) 30 Hz 手部接触不足；更晚(0.25,1.0) 脚穿入台面 9–12 cm。曾尝试“按肩部可达距离额外下压”，导致脚穿入 38–46 cm，已回退。
+- 翻滚跳过片段开头的水平飞扑（ROLL_T0 0.12→0.36，xfade 0.14）。
+- 纹理修复：`keep_compressed_buffer = true`。
+- 新增 anim_vault_contact / anim_mantle_contact → 84/84 @30/60/120 Hz。
+- 可视化：showcase 按动作进度截图（wait_progress），攀爬相机抬高；`/workspace/acceptance/round2/` 产出 mp4/截图/特写/联系表（软件渲染）。
+
+## 可恢复状态（2026-11-03）
+
+- 分支 `dev/movement-system`，PR #1（**不要合并**）。所有代码已推送；测试 84/84 @30/60/120 Hz（`tests/results/`）。
+- 重新录制：见 README“测试”一节（DISPLAY=:17，llvmpipe）。联系表脚本在运行机 `/workspace/eval/sheet.py`（不在仓库中）。
+- 未验收（需 M2 真机）：所有动态观感，尤其是转身/侧移/后退、楼梯/坡道、翻越手部接触、攀爬。
+
 ## 下一步优先级
 
+0. （Round 2）脚部锁定 IK 以消除残留滑步（13–31% 身体速度）；找/做 CC0 的起步/停步/转身/侧移/翻越/攀上台沿专门片段替代程序化补偿；查明攀爬手部接触时长随物理频率变化的原因；真机 M2 验收。
 1. 推箱子 120 Hz 距离差异（~30%）。
 2. 空中接近矮墙时的“跳跃→翻越”衔接（跳跃缓冲进入检测距离时自动转翻越）。
 3. 真实 GPU 上的人工手感验收与参数微调（当前只在 llvmpipe 上渲染过）。
-4. 动画：灰盒程序化姿态 → 骨骼动画/IK（脚部贴地）。
+4. ~~动画：灰盒程序化姿态 → 骨骼动画/IK~~（Round 2 已完成骨骼动画与手部 IK；脚部 IK 未做）。
 5. 移动平台、斜坡上滑铲加速的上限调优。

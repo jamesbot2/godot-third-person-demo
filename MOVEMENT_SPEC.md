@@ -94,3 +94,19 @@
 | min_distance | 0.35 m | 低于此距离隐藏角色模型 |
 | fov_base / sprint_add / slide_add | 72 / +6 / +4 ° | FOV |
 | dip_* | 0.3 / 3.0 / 120 | 落地下沉弹簧 |
+
+## 9. 角色动画（Round 2，`scripts/player/character_animator.gd`）
+
+原则：**物理控制器是唯一权威**。动画只读取控制器状态来表现，片段的根运动在构建时被丢弃（只保留旋转 + 按比例缩放的骨骼盆骨位置），永远不会出现“根运动和控制器同时位移”。
+
+- 节点：`Player(CharacterBody3D) > Model(CharacterAnimator) > UBCMale > Skeleton3D(65 骨, UE 命名) + 网格`，子节点 `BodyPoseModifier`、`ArmIK(TwoBoneIK3D)`；`AnimationPlayer` + `AnimationTree`（`AnimationNodeStateMachine`）。
+- 每帧从控制器暴露的参数：`p_speed`、`p_local_dir`、`p_accel`、`p_turn_rate`、`p_grounded`、`p_vy`、`p_state`、`p_slope_deg`、`p_land_severity`。
+- 状态：`ground`（idle/walk/jog/sprint 混合 + 蹲混合）、`air`（jump_start→jump_air / 下落用 ninja_air 收腿）、`slide`、`roll`、`vault`、`mantle`。过渡带 xfade（0.08–0.2 s），不跳帧。
+- 步态：`_solve_gait(v)` 在实测步幅表（`tools/calibrate_stride.gd` 测出的每个片段每周期前进距离）上插值，`cycle_rate = v / stride`，所有循环片段相位同步（Blend2 + 统一 TimeScale），切换档位时脚不换相。
+- 起步/停步/转身/侧移/后退：**CC0 包里没有专门片段**。用加速度驱动的前倾（atan(a/g)·0.55，−9°…+10°）、刹车后仰、按向心加速度的侧倾（≤14°）、按局部移动方向的下肢扭转（warp）来表现；后退时循环反向播放。
+- 跳跃：jump_start（预备）→ jump_air（上升/滞空）→ 下落按 vy（−0.5…−5 m/s）混入 jump_land 第 0 帧（伸腿准备着地）→ jump_land，落地权重 = 落地严重度（软/中/重），重落地追加骨盆下沉与恢复时间。
+- 滑铲：Slide_Start → Slide → Slide_Exit，seek 到 `slide_time` 对应位置；蹲起与控制器胶囊高度同步。
+- 翻滚：Roll 片段从 `ROLL_T0 = 0.36 s`（跳过片段开头的水平飞扑段）起，按 `roll_time / roll_duration` seek，模型本身不做任何旋转（测试 `anim_roll` 断言 model_tilt = 0）。
+- 翻越（VAULT，≤0.9 m 墙）：ClimbUp_1m 的前 0.42 s 按轨迹进度 u seek + ninja_air 收腿混合（u 0.2→0.45）；`_tr_off` 在 u 0.15–0.95 把视觉根部下压使骨盆约贴墙顶 +0.3 m；前倾 38°；双手 IK 目标 = 墙顶前沿内侧 0.12 m、左右 ±0.2 m，权重 u 0.12→0.3 淡入、0.6→0.78 淡出。
+- 攀爬（MANTLE，1.5 m 台）：ClimbUp_1m 全片段按 u seek；视觉根高度 = 起点 + h·smoothstep(0.2, 0.95, u)（比胶囊上升晚，形成“悬挂→引体”）；前倾 28°；u 0.35–0.6 向墙前移 0.2 m（胶囊半径留出的间隙）；双手 IK 目标 = 台沿内侧 0.07 m，权重 u 0.02→0.14 淡入、0.62→0.82 淡出。
+- 注意（Godot 4.7）：`SkeletonModifier3D`（BodyPoseModifier、TwoBoneIK3D）的结果只在骨骼更新内部有效；在别处调用 `get_bone_global_pose` 拿到的是修改器之前的姿态。`CharacterAnimator` 在 `skeleton_updated` 时快照最终姿态，`get_final_bone_world()` 返回渲染用的最终骨骼位置（测试也用它）。

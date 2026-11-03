@@ -355,7 +355,7 @@ func _run() -> void:
 	# 9. mantle the 1.5 m box
 	if seg("mantle"):
 		await place(Vector3(L.MANTLE_X, 0.02, L.MANTLE_Z + 2.0), 0.0, 0.0)
-		cam(SIDE_CLOSE + Vector3(0, 0.2, 0), 1.2, 44.0)
+		cam(SIDE_CLOSE + Vector3(0.6, 0.5, 0), 0.8, 46.0)
 		move_world = fwd
 		await frames(0.4)
 		Input.action_press("jump")
