@@ -1,5 +1,5 @@
 extends SceneTree
-## Scripted visual showcase (autopilot) for visual acceptance, round 2
+## Scripted visual showcase (autopilot) for visual acceptance, round 2/3
 ## (skeletal character). Must run NON-headless (needs a renderer), e.g.:
 ##   DISPLAY=:17 godot --path . --rendering-driver opengl3 --fixed-fps 30 \
 ##       --write-movie /workspace/acceptance/round2/showcase.avi \
@@ -10,16 +10,20 @@ extends SceneTree
 ## real framebuffer captures (Viewport texture -> PNG). Besides the gameplay
 ## camera, an "inspection" camera can follow the player from a fixed world
 ## offset (side / front / back / close-up) so poses can be reviewed.
+## Close-ups (round 3: feet on stairs / ramp, turn, strafe, ...) are rendered
+## by a second camera in a SubViewport that shares the world, so the movie
+## itself stays continuous (no camera cuts for close-up stills); they are
+## written to <shots>/closeups/.
 
 const L := preload("res://scripts/level/course_layout.gd")
 const ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "jump", "sprint",
 	"crouch", "crouch_toggle", "roll", "walk_toggle", "aim"]
-const SEGMENTS := ["locomotion", "turn_strafe", "jump_land", "stairs", "ramp", "crouch_slide", "roll", "vault", "mantle"]
+const SEGMENTS := ["locomotion", "turn_strafe", "turn_inplace", "jump_land", "stairs", "ramp", "crouch_slide", "roll", "vault", "mantle"]
 var main: Node
 var pc: PlayerController
 var rig: CameraRig
 var anim: Node
-var shots_dir := "/workspace/acceptance/round2"
+var shots_dir := "/workspace/acceptance/round3"
 var only: PackedStringArray = []
 var move_world := Vector3.ZERO   # desired world-space move direction (re-mapped every frame)
 var orbit_rate := 0.0            # camera yaw rad/s
@@ -30,6 +34,9 @@ var icam: Camera3D               # inspection camera
 var icam_off := Vector3.ZERO     # world-space offset from the player
 var icam_look_h := 1.0
 var icam_on := false
+var cvp: SubViewport              # close-up viewport (same world)
+var ccam: Camera3D
+var close_n := 0
 
 
 func _initialize() -> void:
@@ -47,6 +54,18 @@ func _initialize() -> void:
 	icam = Camera3D.new()
 	icam.fov = 50.0
 	main.add_child(icam)
+	cvp = SubViewport.new()
+	cvp.size = Vector2i(960, 720)
+	cvp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	main.add_child(cvp)
+	ccam = Camera3D.new()
+	cvp.add_child(ccam)
+	ccam.current = true
+	ccam.cull_mask = 1                      # close-ups hide course labels
+	for lb in main.find_children("*", "Label3D", true, false):
+		(lb as Label3D).layers = 2
+	DirAccess.make_dir_recursive_absolute(shots_dir + "/closeups")
+	cvp.render_target_update_mode = SubViewport.UPDATE_ONCE  # warm-up render
 	_run.call_deferred()
 
 
@@ -118,6 +137,29 @@ func shot(name: String) -> void:
 	var line := "SHOT|%s|state=%s anim=%s pos=%s hspeed=%.2f vy=%.2f gait=%.2f rate=%.2f warp=%.0f bank=%.1f pitch=%.1f land_w=%.2f" % [
 		path, pc.get_state_name(), d["anim_state"], pc.global_position, pc.get_horizontal_speed(), pc.velocity.y,
 		d["gait"], d["cycle_rate"], d["warp_deg"], d["bank_deg"], d["pitch_deg"], d["land_weight"]]
+	print(line)
+	log_lines.append(line)
+
+
+## Close-up still from the second camera: `off` = world offset from the
+## look-at point at height `look_h` above the player's feet.
+## With `on_pelvis`, the look-at point is the skinned pelvis (+ look_h)
+## instead of the capsule's feet (traversal moves the mesh off the capsule).
+func closeup(name: String, off: Vector3, look_h := 0.3, fov := 32.0, on_pelvis := false) -> void:
+	var target := pc.global_position + Vector3(0, look_h, 0)
+	if on_pelvis:
+		var sk: Skeleton3D = anim.skeleton
+		target = (sk.global_transform * sk.get_bone_global_pose(sk.find_bone("pelvis"))).origin + Vector3(0, look_h, 0)
+	ccam.fov = fov
+	ccam.global_position = target + off
+	ccam.look_at(target, Vector3.UP)
+	for i in 2:   # first render after a camera move can be stale
+		cvp.render_target_update_mode = SubViewport.UPDATE_ONCE
+		await RenderingServer.frame_post_draw
+	close_n += 1
+	var path := "%s/closeups/%02d_%s.png" % [shots_dir, close_n, name]
+	cvp.get_texture().get_image().save_png(path)
+	var line := "CLOSE|%s|state=%s anim=%s pos=%s hspeed=%.2f" % [path, pc.get_state_name(), anim.anim_state, pc.global_position, pc.get_horizontal_speed()]
 	print(line)
 	log_lines.append(line)
 
@@ -214,9 +256,11 @@ func _run() -> void:
 		await frames(1.0)
 		move_world = Vector3(1, 0, 0)
 		await frames(0.2); await shot("turn90_bank")
+		await closeup("sharp_turn90", Vector3(1.8, 1.0, 1.8), 0.5, 36.0)
 		await frames(0.8)
 		move_world = Vector3(-1, 0, 0)
 		await frames(0.15); await shot("turn180_mid")
+		await closeup("sharp_turn180", Vector3(1.8, 1.0, 1.8), 0.5, 36.0)
 		await frames(0.9)
 		release_all(); await frames(0.5)
 		# strafe: hold aim, facing follows the camera (camera looks -Z)
@@ -225,13 +269,36 @@ func _run() -> void:
 		Input.action_press("aim")
 		move_world = Vector3(1, 0, 0)
 		await frames(0.9); await shot("strafe_right_front")
+		await closeup("strafe_right_feet", Vector3(0.0, 0.5, -2.3), 0.3)
 		move_world = Vector3(-1, 0, 0)
 		await frames(1.2); await shot("strafe_left_front")
+		await closeup("strafe_left_feet", Vector3(0.0, 0.5, -2.3), 0.3)
 		cam(SIDE)
 		move_world = Vector3(0, 0, 1)
 		await frames(1.0); await shot("backpedal_side")
+		await closeup("backpedal_feet", Vector3(2.3, 0.4, 0.0), 0.35)
 		move_world = Vector3(1, 0, -1)
 		await frames(0.8); await shot("strafe_diag_side")
+		await closeup("diag_feet", Vector3(2.3, 0.4, 0.0), 0.35)
+		cam(Vector3.ZERO)
+		release_all(); await frames(0.4)
+
+	# 2b. turn in place while aiming (camera swings 90 deg, then 180 deg)
+	if seg("turn_inplace"):
+		await place(Vector3(0, 0.02, 14), 0.0, 0.0)
+		cam(Vector3(2.4, 1.2, -2.4), 0.6, 45.0)
+		Input.action_press("aim")
+		await frames(0.6); await shot("turn_inplace_start")
+		rig.yaw = wrapf(rig.yaw + PI / 2.0, -PI, PI)
+		await frames(2.0 / 30.0)
+		await closeup("turn_inplace90_feet", Vector3(1.6, 0.7, -1.6), 0.4, 38.0)
+		await frames(0.6); await shot("turn_inplace90_done")
+		await closeup("turn_inplace90_settled", Vector3(1.6, 0.7, -1.6), 0.4, 38.0)
+		rig.yaw = wrapf(rig.yaw + PI * 0.999, -PI, PI)
+		await frames(3.0 / 30.0)
+		await closeup("turn_inplace180_feet", Vector3(1.6, 0.7, -1.6), 0.4, 38.0)
+		await frames(0.8); await shot("turn_inplace180_done")
+		await closeup("turn_inplace180_settled", Vector3(1.6, 0.7, -1.6), 0.4, 38.0)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.4)
 
@@ -249,6 +316,7 @@ func _run() -> void:
 				break
 			await frames(1.0 / 30.0)
 		await frames(2.0 / 30.0); await shot("jump_land_soft")
+		await closeup("jump_land_feet", Vector3(2.0, 0.4, 0.5), 0.35)
 		await frames(0.6)
 		move_world = fwd
 		await frames(0.8)
@@ -270,6 +338,7 @@ func _run() -> void:
 			await frames(1.0 / 30.0)
 		move_world = Vector3.ZERO
 		await frames(2.0 / 30.0); await shot("drop_land_hard")
+		await closeup("drop_land_feet", Vector3(0.4, 0.4, 2.2), 0.4, 36.0)
 		await frames(0.25); await shot("drop_recover")
 		await frames(0.6)
 		cam(Vector3.ZERO)
@@ -281,8 +350,11 @@ func _run() -> void:
 		cam(SIDE + Vector3(0, 0.3, 0))
 		move_world = fwd
 		await frames(1.1); await shot("stairs_up_side")
+		await closeup("stairs_up_feet", Vector3(2.0, 0.3, 0.0), 0.3)
 		await frames(0.25); await shot("stairs_up_side_b")
+		await closeup("stairs_up_feet_b", Vector3(2.0, 0.3, 0.0), 0.3)
 		await frames(1.6); await shot("stairs_down_side")
+		await closeup("stairs_down_feet", Vector3(2.0, 0.3, 0.0), 0.3)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.4)
 
@@ -291,7 +363,11 @@ func _run() -> void:
 		await place(Vector3(L.ramp_x(2), 0.02, L.RAMP_Z0 + 2.0), 0.0, 0.0)
 		cam(SIDE + Vector3(0, 0.3, 0))
 		move_world = fwd
-		await frames(1.25); await shot("ramp30_up_side")
+		await frames(0.8)
+		await closeup("ramp30_feet", Vector3(1.8, 0.35, 0.3), -0.6, 46.0, true)
+		await frames(0.12)
+		await closeup("ramp30_feet_b", Vector3(1.8, 0.35, 0.3), -0.6, 46.0, true)
+		await frames(0.2); await shot("ramp30_up_side")
 		await frames(0.6)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.3)
@@ -310,6 +386,7 @@ func _run() -> void:
 		await tap("crouch_toggle")
 		await frames(0.1); await shot("slide_entry")
 		await frames(0.35); await shot("slide_mid")
+		await closeup("slide", Vector3(2.4, 0.3, 0.3), 0.4, 40.0)
 		await wait_state("GROUND", 1.5)
 		await frames(0.1); await shot("slide_exit")
 		await frames(0.6)
@@ -325,9 +402,13 @@ func _run() -> void:
 		await tap("roll")
 		await wait_state("ROLL", 0.5)
 		await wait_progress(0.12); await shot("roll_a")
+		await closeup("roll_a", Vector3(2.4, 0.1, 0.0), 0.0, 42.0, true)
 		await wait_progress(0.4); await shot("roll_b")
+		await closeup("roll_b", Vector3(2.4, 0.1, 0.0), 0.0, 42.0, true)
 		await wait_progress(0.62); await shot("roll_c")
+		await closeup("roll_c", Vector3(2.4, 0.1, 0.0), 0.0, 42.0, true)
 		await wait_progress(0.88); await shot("roll_d")
+		await closeup("roll_d", Vector3(2.4, 0.1, 0.0), 0.0, 42.0, true)
 		await frames(0.6)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.4)
@@ -345,12 +426,15 @@ func _run() -> void:
 		await wait_state("VAULT", 1.0)
 		await wait_progress(0.1); await shot("vault_reach")
 		await wait_progress(0.25); await shot("vault_plant")
+		await closeup("vault_plant", Vector3(2.4, 0.3, 0.4), 0.0, 45.0, true)
 		Input.action_release("jump")
 		await wait_progress(0.4); await shot("vault_over_a")
 		await wait_progress(0.55); await shot("vault_over_b")
+		await closeup("vault_over", Vector3(2.4, 0.3, 0.4), 0.0, 45.0, true)
 		await wait_progress(0.7); await shot("vault_release")
 		await wait_progress(0.86); await shot("vault_clear")
 		await frames(0.25); await shot("vault_land")
+		await closeup("vault_land_feet", Vector3(2.2, 0.0, 0.3), -0.55, 40.0, true)
 		await frames(0.8)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.3)
@@ -366,9 +450,12 @@ func _run() -> void:
 		await wait_progress(0.05); await shot("mantle_reach")
 		await wait_progress(0.15); await shot("mantle_grab")
 		await wait_progress(0.3); await shot("mantle_hang")
+		await closeup("mantle_hang_hands", Vector3(2.4, 0.2, 0.9), 0.3, 45.0, true)
 		await wait_progress(0.45); await shot("mantle_pull")
 		await wait_progress(0.58); await shot("mantle_knee")
+		await closeup("mantle_knee", Vector3(2.4, 0.2, 0.9), 0.0, 45.0, true)
 		await wait_progress(0.7); await shot("mantle_step")
+		await closeup("mantle_step_feet", Vector3(2.2, 0.0, 0.6), -0.4, 42.0, true)
 		await wait_progress(0.82); await shot("mantle_rise")
 		await wait_progress(0.93); await shot("mantle_stand")
 		release_all()
