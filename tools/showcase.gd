@@ -23,7 +23,7 @@ var main: Node
 var pc: PlayerController
 var rig: CameraRig
 var anim: Node
-var shots_dir := "/workspace/acceptance/round5"
+var shots_dir := "/workspace/acceptance/round6"
 var only: PackedStringArray = []
 var move_world := Vector3.ZERO   # desired world-space move direction (re-mapped every frame)
 var orbit_rate := 0.0            # camera yaw rad/s
@@ -292,6 +292,9 @@ func _run() -> void:
 		move_world = Vector3(0, 0, 1)
 		await frames(1.0); await shot("backpedal_side")
 		await closeup("backpedal_feet", Vector3(2.3, 0.4, 0.0), 0.35)
+		move_world = Vector3(0, 0, -1)
+		await frames(1.0); await shot("aim_fwd_side")
+		await closeup("aim_fwd_feet", Vector3(2.3, 0.4, 0.0), 0.35)
 		move_world = Vector3(1, 0, -1)
 		await frames(0.8); await shot("strafe_diag_side")
 		await closeup("diag_feet", Vector3(2.3, 0.4, 0.0), 0.35)

@@ -1350,7 +1350,7 @@ func t_anim() -> void:
 			# regression to the raw clip, not a full redesign.
 			check("anim_backpedal_gait", res["knee_lead"] < 0.33, "max swing knee lead ahead of hips=%.2f m (raw reversed forward clip 0.36)" % res["knee_lead"])
 		var aim_set: bool = _anim.has_aim_set
-		var authored: bool = aim_set and spec[0] in ["strafe_left", "strafe_right", "diag_fl", "diag_br"]
+		var authored: bool = aim_set and spec[0] in ["aim_fwd", "strafe_left", "strafe_right", "backpedal", "diag_fl", "diag_br"]
 		var is_strafe: bool = spec[0] in ["strafe_left", "strafe_right"]
 		metric("anim_%s_warp_deg" % spec[0], res["warp"])
 		if is_strafe:

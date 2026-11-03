@@ -99,6 +99,10 @@ const LEN_CWALK := 2.0
 @export var strafe_stride := 1.6
 ## Distance per cycle of the authored diagonal clips (m).
 @export var diag_stride := 2.0
+## aimed backpedal stride vs the forward-gait table stride at its speed
+## (round 6: shorter, quicker backward steps; the re-posed aim_bwd sweeps
+## exactly this stride)
+@export var backpedal_stride_scale := 0.7
 @export var backward_enter_deg := 115.0
 @export var backward_exit_deg := 95.0
 
@@ -371,8 +375,8 @@ func _build_aim_set() -> void:
 	var gf := _solve_gait(vf * 2.0 / _cadence(vf), 0.0)
 	var gb := _solve_gait(vb * 2.0 / _cadence(vb), 0.0)
 	_aim_stride_f = _stride_at(gf, 0.0)
-	_aim_stride_b = _stride_at(gb, 0.0)
-	StrafeGait.build(skeleton, clip_library(), gf, gb, strafe_stride, diag_stride, unit)
+	_aim_stride_b = _stride_at(gb, 0.0) * backpedal_stride_scale
+	StrafeGait.build(skeleton, clip_library(), gf, gb, strafe_stride, diag_stride, unit, _aim_stride_f, _aim_stride_b)
 	has_aim_set = true
 
 

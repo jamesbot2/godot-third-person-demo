@@ -40,6 +40,24 @@ const BULGE_LEAD := -0.04
 const NARROW := 0.6
 ## max hip->ankle reach as a fraction of the straight leg
 const REACH := 0.965
+## round 6 re-posed aim_fwd / aim_bwd (see build): stance fraction, swing
+## lift (m), stance width scale, stance centre offset along the movement (m;
+## the backpedal plants a little behind the body so the swing knee does not
+## reach forward)
+const FB_DUTY := 0.42
+const FB_DUTY_B := 0.38
+const FB_LIFT_F := 0.16
+const FB_LIFT_B := 0.08
+const FB_NARROW := 0.75
+const FB_C_F := 0.0
+const FB_C_B := 0.0
+## swing end tangents vs the stance velocity (less overshoot than strafe)
+const FB_TAN := 0.35
+## swing lift timing (peak at s = 0.5^(1/skew)): the forward swing lifts
+## early (heel recovery behind the body), the backpedal swing late (the foot
+## stays low while it is in front, lifts behind)
+const FB_SKEW_F := 0.7
+const FB_SKEW_B := 2.5
 
 
 static func _track_map(skel: Skeleton3D, anim: Animation) -> Dictionary:
@@ -177,7 +195,8 @@ static func _solve_leg(g: Array, ih: int, ik: int, ia: int, tgt: Vector3, pole: 
 ## in skeleton units, `unit` = metres per skeleton unit. Each stance foot
 ## moves along -dir at one stride per cycle; with a lateral component the
 ## trailing foot crosses in front (cross-step), scaled by |dir.x|.
-static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vector3, stride: float, unit: float) -> Array:
+static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vector3, stride: float, unit: float,
+		duty := DUTY, lift := LIFT, narrow := NARROW, c_off := 0.0, tan := 1.0, stagger := true, skew := 1.0) -> Array:
 	var b_pel := skel.find_bone("pelvis")
 	var ig := _fk(skel, idle_loc)
 	var legs := {}
@@ -185,7 +204,7 @@ static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vec
 		legs[sd] = {"h": skel.find_bone("thigh_" + sd), "k": skel.find_bone("calf_" + sd),
 			"a": skel.find_bone("foot_" + sd), "ball": skel.find_bone("ball_" + sd)}
 	var cross := absf(dvec.x)
-	var sweep := stride * DUTY
+	var sweep := stride * duty
 	var n := base.size()
 	# pass 1: ankle targets + needed pelvis drop
 	var tg := []
@@ -201,26 +220,26 @@ static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vec
 			var ip: Vector3 = (ig[L["a"]] as Transform3D).origin
 			var ya := ip.y
 			ip.y = 0.0
-			var c := ip.dot(dvec) * NARROW
-			var perp := (ip - dvec * ip.dot(dvec)) * NARROW
+			var c := (ip.dot(dvec) * narrow if stagger else 0.0) + c_off / unit
+			var perp := (ip - dvec * ip.dot(dvec)) * narrow
 			var trail := c < 0.0
 			var p := fposmod(u - (0.0 if sd == "l" else 0.5), 1.0)
 			var lat: float
 			var h := 0.0
 			var bul := 0.0
-			if p < DUTY:
-				lat = c + sweep * 0.5 - sweep * (p / DUTY)
+			if p < duty:
+				lat = c + sweep * 0.5 - sweep * (p / duty)
 			else:
-				var s := (p - DUTY) / (1.0 - DUTY)
+				var s := (p - duty) / (1.0 - duty)
 				# cubic Hermite with the stance velocity at both ends: no
 				# velocity step at lift-off / touchdown (the foot keeps
 				# moving back for a moment, then whips across)
-				var m := -sweep / DUTY * (1.0 - DUTY)
+				var m := -sweep / duty * (1.0 - duty) * tan
 				var s2 := s * s
 				var s3 := s2 * s
 				lat = (2.0 * s3 - 3.0 * s2 + 1.0) * (c - sweep * 0.5) + (s3 - 2.0 * s2 + s) * m \
 					+ (-2.0 * s3 + 3.0 * s2) * (c + sweep * 0.5) + (s3 - s2) * m
-				h = LIFT / unit * pow(sin(PI * s), 0.6)   # quick lift-off / set-down
+				h = lift / unit * pow(sin(PI * pow(s, skew)), 0.6)   # quick lift-off / set-down
 				bul = (BULGE_TRAIL if trail else BULGE_LEAD) / unit * sin(PI * s) * cross
 			var zoff := (Z_TRAIL if trail else Z_LEAD) / unit * cross + bul
 			var tgt := dvec * lat + perp + Vector3(0, ya + h, zoff)
@@ -281,8 +300,9 @@ const POINTS := [
 
 ## Builds the aim set (POINTS) into `lib` (no-op if present). g_f / g_b:
 ## walk..jog gait weights for the aim forward / backpedal speed;
-## side_m / diag_m: authored strides (m per cycle).
-static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: float, side_m: float, diag_m: float, unit: float) -> void:
+## side_m / diag_m: authored strides (m per cycle); f_m / b_m: the aim
+## forward / backpedal strides (m per cycle) the re-posed aim_fwd / aim_bwd sweep.
+static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: float, side_m: float, diag_m: float, unit: float, f_m: float = 2.0, b_m: float = 2.0) -> void:
 	if lib.has_animation("strafe_r"):
 		return
 	var walk := lib.get_animation("walk")
@@ -290,8 +310,15 @@ static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: floa
 	var bwd := aligned(skel, lib.get_animation("walk_bwd"), lib.get_animation("jog_bwd"), g_b, false)
 	var idle := lib.get_animation("idle")
 	var idle_loc := _locals(skel, idle, _track_map(skel, idle), 0.0)
-	lib.add_animation("aim_fwd", to_anim(skel, fwd, walk))
-	lib.add_animation("aim_bwd", to_anim(skel, bwd, walk))
+	if OS.get_environment("AIM_FB_RAW") == "1":
+		lib.add_animation("aim_fwd", to_anim(skel, fwd, walk))
+		lib.add_animation("aim_bwd", to_anim(skel, bwd, walk))
+	else:
+		# round 6: re-posed at the source like the strafe set (upper body,
+		# arms, pelvis = the CC0 blend; legs re-solved, stance foot sweeps
+		# exactly one stride per cycle -> no clip slip by construction)
+		lib.add_animation("aim_fwd", to_anim(skel, dir_frames(skel, fwd, idle_loc, Vector3(0, 0, 1), f_m / unit, unit, FB_DUTY, FB_LIFT_F, FB_NARROW, FB_C_F, FB_TAN, false, FB_SKEW_F), walk))
+		lib.add_animation("aim_bwd", to_anim(skel, dir_frames(skel, bwd, idle_loc, Vector3(0, 0, -1), b_m / unit, unit, FB_DUTY_B, FB_LIFT_B, FB_NARROW, FB_C_B, FB_TAN, false, FB_SKEW_B), walk))
 	for pt in POINTS:
 		var nm: String = pt[0]
 		if lib.has_animation(nm):
