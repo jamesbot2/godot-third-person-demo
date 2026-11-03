@@ -856,7 +856,8 @@ var _sk: Skeleton3D
 
 
 func _bone_world(n: String) -> Vector3:
-	return (_sk.global_transform * _sk.get_bone_global_pose(_sk.find_bone(n))).origin
+	# final rendered pose (after lean/warp/IK modifiers), see CharacterAnimator
+	return _anim.get_final_bone_world(n)
 
 
 func _not_tpose() -> bool:
@@ -873,6 +874,35 @@ func _wait_anim(st: String, timeout: float) -> bool:
 		if _anim.anim_state == st:
 			return true
 	return false
+
+
+## Samples the final rendered pose while the controller is in TRAVERSE.
+## Obstacle: top at `top_y`, front face at z `z_face`, back face at `z_back`
+## (the course approaches along -Z). Returns the closest hand-to-top-edge
+## distance, how many ticks a hand was within 8 cm, and the deepest a foot
+## (ankle or ball bone) got inside the obstacle volume.
+func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary:
+	var best := INF
+	var close := 0
+	var pen := 0.0
+	for n in secs(2.0):
+		if pc.state != PlayerController.State.TRAVERSE:
+			break
+		var near := false
+		for h in ["hand_l", "hand_r"]:
+			var p := _bone_world(h)
+			var q := Vector3(p.x, top_y, clampf(p.z, z_back, z_face))
+			var d := p.distance_to(q)
+			best = minf(best, d)
+			near = near or d < 0.08
+		if near:
+			close += 1
+		for f in ["foot_l", "foot_r", "ball_l", "ball_r"]:
+			var p := _bone_world(f)
+			if p.z < z_face and p.z > z_back and p.y < top_y:
+				pen = maxf(pen, minf(top_y - p.y, minf(z_face - p.z, p.z - z_back)))
+		await tick()
+	return {"hand": best, "hand_frames": close, "pen": pen}
 
 
 func t_anim() -> void:
@@ -977,13 +1007,21 @@ func t_anim() -> void:
 	await walk_until_z(L.VAULT_Z + 1.0, 2.0)
 	press("jump")
 	var saw_vault := await _wait_anim("vault", 1.0)
+	# contact: hands come down onto the wall top, feet never inside the wall
+	var v := await _traverse_contact(L.VAULT_H, L.VAULT_Z, L.VAULT_Z - L.VAULT_T)
 	release_all()
 	await tick(secs(1.0))
+	check("anim_vault_contact", v["hand"] < 0.12 and v["pen"] < 0.04,
+		"closest hand-to-wall-top=%.3f m  max foot penetration=%.3f m" % [v["hand"], v["pen"]])
 	await place(Vector3(L.MANTLE_X, 0.02, L.MANTLE_Z + 1.0))
 	press("move_forward")
 	await tick(secs(0.4))
 	press("jump")
 	var saw_mantle := await _wait_anim("mantle", 1.0)
+	var m := await _traverse_contact(L.MANTLE_H, L.MANTLE_Z, L.MANTLE_Z - 3.0)
 	release_all()
 	await tick(secs(0.8))
+	check("anim_mantle_contact", m["hand"] < 0.08 and m["hand_frames"] >= secs(0.15) and m["pen"] < 0.04,
+		"closest hand-to-ledge=%.3f m  frames within 8 cm=%d  max foot penetration=%.3f m" % [m["hand"], m["hand_frames"], m["pen"]])
 	check("anim_traverse_states", saw_vault and saw_mantle and _anim.anim_state == "ground", "vault=%s mantle=%s end=%s" % [saw_vault, saw_mantle, _anim.anim_state])
+

@@ -45,7 +45,7 @@ const LEN_CWALK := 2.0
 @export var backward_exit_deg := 95.0
 
 # Roll clip window used for the controller's roll (s, clip time).
-const ROLL_T0 := 0.12
+const ROLL_T0 := 0.36
 const ROLL_T1 := 1.25
 const SLIDE_T0 := 0.30
 const SLIDE_T1 := 0.83
@@ -95,6 +95,23 @@ var _bank_s := 0.0
 var _pitch_s := 0.0
 var _drop_s := 0.0
 var _prev_ctrl_state := "GROUND"
+# hand IK (vault / mantle contact) + traverse visual offset
+var arm_ik: SkeletonModifier3D      # TwoBoneIK3D (2 settings: left, right arm)
+var hand_ik_weight := 0.0
+var _ik_t: Array[Marker3D] = []     # targets  [l, r]
+var _ik_p: Array[Marker3D] = []     # poles    [l, r]
+var _tr_off := 0.0                  # vertical visual offset during traverse (m)
+var _tr_fwd_off := 0.0              # forward visual offset (toward the obstacle) (m)
+var _tr_off_prev := 0.0
+var _tr_fwd_off_prev := 0.0
+## upperarm->hand length of the UBC skeleton (0.49 m) minus a little slack
+const ARM_REACH := 0.465
+var _tr_lean := 0.0
+var _tr_start_y := 0.0
+var _tr_h := 0.0
+var _tr_top := 0.0
+var _tr_face := Vector3.ZERO
+var _tr_fwd := Vector3.FORWARD
 
 
 func _ready() -> void:
@@ -108,6 +125,10 @@ func _ready() -> void:
 	pose_mod = BodyPoseModifierScript.new()
 	pose_mod.name = "BodyPoseModifier"
 	skeleton.add_child(pose_mod)
+	_setup_arm_ik()
+	# Modifier results (lean/warp/IK) only exist while the skeleton is being
+	# finalised; snapshot the FINAL pose so tests/debug measure what is drawn.
+	skeleton.skeleton_updated.connect(_snapshot_final_pose)
 	anim_player = AnimationPlayer.new()
 	anim_player.name = "AnimationPlayer"
 	add_child(anim_player)
@@ -131,6 +152,45 @@ func _ready() -> void:
 		_prev_yaw = _yaw
 		rotation.y = _yaw
 	anim_tree.advance(0.0)
+
+
+var _final_pose: Array[Transform3D] = []
+
+
+func _snapshot_final_pose() -> void:
+	var n := skeleton.get_bone_count()
+	_final_pose.resize(n)
+	for i in n:
+		_final_pose[i] = skeleton.get_bone_global_pose(i)
+
+
+## World-space position of a bone in the final (post-modifier) pose that is
+## rendered. Falls back to the animation pose before the first update.
+func get_final_bone_world(bone_name: String) -> Vector3:
+	var i := skeleton.find_bone(bone_name)
+	var pose := _final_pose[i] if i >= 0 and i < _final_pose.size() else skeleton.get_bone_global_pose(i)
+	return (skeleton.global_transform * pose).origin
+
+
+func _setup_arm_ik() -> void:
+	var ik := TwoBoneIK3D.new()
+	ik.name = "ArmIK"
+	skeleton.add_child(ik)   # after BodyPoseModifier: runs on the final pose
+	ik.set_setting_count(2)
+	for i in 2:
+		var sd := "l" if i == 0 else "r"
+		var t := Marker3D.new(); t.name = "HandTarget_" + sd; t.top_level = true
+		var pl := Marker3D.new(); pl.name = "ElbowPole_" + sd; pl.top_level = true
+		add_child(t); add_child(pl)
+		_ik_t.append(t); _ik_p.append(pl)
+		ik.set_root_bone_name(i, "upperarm_" + sd)
+		ik.set_middle_bone_name(i, "lowerarm_" + sd)
+		ik.set_end_bone_name(i, "hand_" + sd)
+		ik.set_target_node(i, ik.get_path_to(t))
+		ik.set_pole_node(i, ik.get_path_to(pl))
+	ik.influence = 0.0
+	ik.active = false
+	arm_ik = ik
 
 
 # ----------------------------------------------------------------- tree ---
@@ -217,7 +277,7 @@ func _build_tree() -> AnimationNodeStateMachine:
 	vt.connect_node("output", 0, _blend2(vt, "tuck_mix", vc, vtuck, Vector2(700, 100)))
 	sm.add_node("vault", vt, Vector2(900, 400))
 	var xfade := {"ground": 0.18, "jump": 0.08, "air": 0.2, "slide": 0.12, "slide_exit": 0.1,
-		"roll": 0.08, "mantle": 0.1, "vault": 0.1}
+		"roll": 0.14, "mantle": 0.1, "vault": 0.1}
 	for a in xfade:
 		for b in xfade:
 			if a != b:
@@ -335,6 +395,7 @@ func update_presentation(dt: float) -> void:
 	_update_state_machine(st)
 	_drive_ground(dt)
 	_drive_actions(dt)
+	_drive_traverse_contact(dt, st)
 	_drive_procedural(dt, st)
 	_prev_ctrl_state = st
 
@@ -431,11 +492,74 @@ func _drive_actions(_dt: float) -> void:
 			_p("mantle/c_ts/scale", 0.0)
 		"vault":
 			var u := get_traverse_progress()
-			_p("vault/c_seek/seek_request", lerpf(CLIMB_T0, 0.42, minf(u / 0.6, 1.0)))
+			_p("vault/c_seek/seek_request", lerpf(CLIMB_T0, 0.42, minf(u / 0.45, 1.0)))
 			_p("vault/c_ts/scale", 0.0)
 			_p("vault/tuck_seek/seek_request", 0.4)
 			_p("vault/tuck_ts/scale", 0.0)
-			_p("vault/tuck_mix/blend_amount", smoothstep(0.45, 0.8, u))
+			_p("vault/tuck_mix/blend_amount", smoothstep(0.2, 0.45, u))
+
+
+## Vault / mantle presentation: keep the visual body low until the hands are
+## planted on the obstacle edge, then let it catch up with the capsule (pure
+## visual offset, the controller path is untouched), and pull the hands onto
+## the real edge with two-bone arm IK while they can reach it.
+func _drive_traverse_contact(dt: float, st: String) -> void:
+	var trav := st == "VAULT" or st == "MANTLE"
+	if trav and (_prev_ctrl_state != st or _tr_h == 0.0):
+		var pts: Array = _pc._tr_points
+		_tr_fwd = _pc._tr_dir
+		_tr_start_y = (pts[0] as Vector3).y
+		_tr_h = (pts[1] as Vector3).y - _tr_start_y
+		_tr_top = (pts[1] as Vector3).y - 0.06
+		_tr_face = (pts[1] as Vector3) + _tr_fwd * _pc.body_radius
+	if not trav:
+		_tr_h = 0.0
+		_tr_off = lerpf(_tr_off, 0.0, 1.0 - exp(-16.0 * dt))
+		_tr_fwd_off = lerpf(_tr_fwd_off, 0.0, 1.0 - exp(-16.0 * dt))
+		_tr_lean = lerpf(_tr_lean, 0.0, 1.0 - exp(-10.0 * dt))
+		hand_ik_weight = lerpf(hand_ik_weight, 0.0, 1.0 - exp(-20.0 * dt))
+		_tr_off_prev = _tr_off
+		_tr_fwd_off_prev = _tr_fwd_off
+	else:
+		var u := get_traverse_progress()
+		var y := _pc.global_position.y
+		var plant_in := 0.0
+		var plant_out := 1.0
+		var inset := 0.07
+		if st == "MANTLE":
+			# hang/reach -> pull: visual root rises later than the capsule
+			var w := _tr_start_y + _tr_h * smoothstep(0.2, 0.95, u)
+			_tr_off = minf(0.0, w - y)
+			_tr_lean = deg_to_rad(28.0) * smoothstep(0.1, 0.4, u) * (1.0 - smoothstep(0.75, 1.0, u))
+			# the capsule keeps its radius off the wall; the chest should not
+			_tr_fwd_off = 0.2 * smoothstep(0.35, 0.6, u) * (1.0 - smoothstep(0.8, 1.0, u))
+			plant_in = smoothstep(0.02, 0.14, u)
+			plant_out = 1.0 - smoothstep(0.62, 0.82, u)
+		else:
+			# speed vault: hips skim ~0.35 m over the top while hands push off it
+			var bump := smoothstep(0.15, 0.4, u) * (1.0 - smoothstep(0.7, 0.95, u))
+			var dip := maxf(0.0, y - (_tr_top + 0.3 - 0.91))
+			_tr_off = -dip * bump
+			_tr_lean = deg_to_rad(38.0) * bump
+			_tr_fwd_off = 0.0
+			plant_in = smoothstep(0.12, 0.3, u)
+			plant_out = 1.0 - smoothstep(0.6, 0.78, u)
+			inset = 0.12
+		hand_ik_weight = plant_in * plant_out
+		var right := _tr_fwd.cross(Vector3.UP).normalized()
+		_tr_off_prev = _tr_off
+		_tr_fwd_off_prev = _tr_fwd_off
+		for i in 2:
+			var side := -1.0 if i == 0 else 1.0
+			var tp := Vector3(_tr_face.x, _tr_top + 0.045, _tr_face.z) + _tr_fwd * inset + right * side * 0.2
+			_ik_t[i].global_position = tp
+			# elbows: behind and outside the hand, slightly down (push-up)
+			_ik_p[i].global_position = tp - _tr_fwd * 0.6 + right * side * 0.45 - Vector3.UP * 0.1
+			_ik_t[i].global_basis = Basis.looking_at(-_tr_fwd, Vector3.UP)
+	arm_ik.influence = clampf(hand_ik_weight, 0.0, 1.0)
+	arm_ik.active = hand_ik_weight > 0.001
+	var lf := global_basis.inverse() * (_tr_fwd * _tr_fwd_off)
+	character.position = Vector3(lf.x, _vis_y + _tr_off, lf.z)
 
 
 func get_traverse_progress() -> float:
@@ -453,6 +577,8 @@ func _drive_procedural(dt: float, st: String) -> void:
 	var pitch_t := clampf(atan(a_f / 9.81) * 0.55, deg_to_rad(-9.0), deg_to_rad(10.0)) if on_ground else 0.0
 	var bank_t := clampf(-atan(a_lat / 9.81) * 0.6, deg_to_rad(-14.0), deg_to_rad(14.0)) if on_ground and not _pc.is_crouched else 0.0
 	_pitch_s = lerpf(_pitch_s, pitch_t, 1.0 - exp(-8.0 * dt))
+	if st == "VAULT" or st == "MANTLE" or absf(_tr_lean) > 0.001:
+		_pitch_s = maxf(_pitch_s, _tr_lean)
 	_bank_s = lerpf(_bank_s, bank_t, 1.0 - exp(-8.0 * dt))
 	# Slope / stair: drop the pelvis a little so the lower foot reaches.
 	var drop_t := clampf(tan(deg_to_rad(p_slope_deg)) * 0.12, 0.0, 0.08) if on_ground else 0.0

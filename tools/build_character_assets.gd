@@ -77,6 +77,7 @@ func _tex(img: Image, size: int, normal: bool) -> Texture2D:
 	img.resize(size, size, Image.INTERPOLATE_LANCZOS)
 	img.generate_mipmaps(normal)
 	var t := PortableCompressedTexture2D.new()
+	t.keep_compressed_buffer = true   # required to serialize outside the editor
 	t.create_from_image(img, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSY, normal, 0.92)
 	return t
 
