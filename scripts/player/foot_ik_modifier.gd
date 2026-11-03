@@ -32,6 +32,7 @@ const RELEASE_H := 0.06         # ... to release
 const SIDES: Array[String] = ["l", "r"]
 
 ## 0..1 overall weight (animator fades it with the ground state)
+var space_provider: Node = null   # CharacterAnimator (render_xf)
 var weight := 0.0
 ## allow locking (0 disables only the pin, placement still runs)
 var lock_enabled := true
@@ -114,7 +115,9 @@ func _process_modification() -> void:
 		_init_ground = false
 		debug = {"planted": [false, false], "pelvis": 0.0}
 		return
-	var xf := sk.global_transform
+	# solve in the frame the skeleton is DRAWN in (physics interpolation on;
+	# see CharacterAnimator.render_xf)
+	var xf: Transform3D = space_provider.render_xf(sk) if space_provider else sk.global_transform
 	var inv := xf.affine_inverse()
 	var space := sk.get_world_3d().direct_space_state
 	var sk_yaw := atan2(xf.basis.z.x, xf.basis.z.z)

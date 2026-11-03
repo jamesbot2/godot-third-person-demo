@@ -107,8 +107,7 @@
 - 跳跃：jump_start（预备）→ jump_air（上升/滞空）→ 下落按 vy（−0.5…−5 m/s）混入 jump_land 第 0 帧（伸腿准备着地）→ jump_land，落地权重 = 落地严重度（软/中/重），重落地追加骨盆下沉与恢复时间。
 - 滑铲：Slide_Start → Slide → Slide_Exit，seek 到 `slide_time` 对应位置；蹲起与控制器胶囊高度同步。
 - 翻滚：Roll 片段从 `ROLL_T0 = 0.36 s`（跳过片段开头的水平飞扑段）起，按 `roll_time / roll_duration` seek，模型本身不做任何旋转（测试 `anim_roll` 断言 model_tilt = 0）。
-- 翻越（VAULT，≤0.9 m 墙）：ClimbUp_1m 的前 0.42 s 按轨迹进度 u seek + ninja_air 收腿混合（u 0.2→0.45）；`_tr_off` 在 u 0.15–0.95 把视觉根部下压使骨盆约贴墙顶 +0.3 m；前倾 38°；双手 IK 目标 = 墙顶前沿内侧 0.12 m、左右 ±0.2 m，权重 u 0.12→0.3 淡入、0.6→0.78 淡出。
-- 攀爬（MANTLE，1.5 m 台）：ClimbUp_1m 全片段按 u seek；视觉根高度 = 起点 + h·smoothstep(0.2, 0.95, u)（比胶囊上升晚，形成“悬挂→引体”）；前倾 28°；u 0.35–0.6 向墙前移 0.2 m（胶囊半径留出的间隙）；双手 IK 目标 = 台沿内侧 0.07 m，权重 u 0.02→0.14 淡入、0.62→0.82 淡出。
+- 翻越 / 攀爬（Round 3 起）：见 §9.y。Round 2 的 ClimbUp_1m + ninja_air 拼接方案已被替换。
 - 注意（Godot 4.7）：`SkeletonModifier3D`（BodyPoseModifier、TwoBoneIK3D）的结果只在骨骼更新内部有效；在别处调用 `get_bone_global_pose` 拿到的是修改器之前的姿态。`CharacterAnimator` 在 `skeleton_updated` 时快照最终姿态，`get_final_bone_world()` 返回渲染用的最终骨骼位置（测试也用它）。
 
 
@@ -123,3 +122,30 @@
 | max_pelvis_drop | 0.26 m | 骨盆最大下沉 |
 | 鞋底高度 | 踝 ≥ 地面+0.093，球骨 ≥ 地面+0.024 | 不入地 |
 | 生效 | 仅 GROUND 且动画为 ground | 淡入 10/s，淡出 30/s；物理控制器仍是唯一位移权威，IK 只改骨骼 |
+
+
+### 9.y 翻越 / 攀爬：真实片段 + 接触驱动视觉根（Round 3，`character_animator.gd::_drive_traverse_contact`）
+
+片段：Quaternius UAL2 “Source” 级 CC0 片段（经 Drawcall Market 免费获取，见 THIRD_PARTY），`tools/retarget_drawcall.gd` 重定向到 UE 65 骨：
+翻越 = `vault_safety`（safety-vault），攀爬 = `climb_up_2m`（从 MANTLE_T0 = 0.24 s 起播，跳过 2 m 版本的下蹲起跳）。
+片段没有根骨，位移只在盆骨轨道里；**控制器仍是唯一位移权威**，下面的一切只移动 `character.position`（视觉偏移）和骨骼。
+
+1. 片段时间 t 由控制器轨迹进度 u 驱动（翻越：u 0–0.15 → 0–VAULT_PLANT 0.07，0.15–0.75 → 至 VAULT_RELEASE 0.48；攀爬：t = lerp(0.24, 1.30, u)）。
+2. `ClipSampler` 在 `_ready` 用真实骨架离线采样片段中手/脚/球骨/盆骨/上臂的位置（60 Hz）。
+3. 视觉根：
+   - 手撑阶段：root_y = 墙顶 + PALM_H(0.03) − 片段手高；root_f = 前沿 + HAND_INSET(0.06) + 片段手前后 → 片段里的手正好落在台面上。
+   - 攀爬 t ≥ MANTLE_FEET(0.91)：root_y = 台面 − `sole_min(t)`（片段中最低鞋底），即脚踩在台面上。
+   - 钳制：鞋底不低于起点地面；任一只脚预测位于障碍物顶面范围（前沿 → `_find_back_face` 射线测得的后沿）时鞋底不低于顶面；
+     顶面以下的脚不超过前立面（`root_f` 后推）。
+   - 攀爬 u 0.9–1.0 偏移淡出到 0，交还给胶囊，无跳变。
+4. 手：每侧一个 `TwoBoneIK3D`。目标点在第一次有权重时固定（世界坐标）；攀爬时目标从片段（FK）手的位置出发，**先升到台沿上方再向内落到撑点**
+   （顶面以下时目标不越过前立面），所以伸手不会穿过台沿角。若肩到撑点距离超过臂长（视觉根被脚部钳制抬高），该手权重按超出量 0–3 cm 淡出，
+   即“手离开台面”，而不是 IK 报告满权重但手腕悬空。`hand_contact[i]` = 撑稳（目标在撑点且权重 > 0.99），测试用它判定。
+5. 鞋底深度常量 `ClipSampler.SOLE`：球骨 0.024 m，踝骨 0.093 m。
+
+**物理插值下的取值时机（关键发现，Godot 4.7.2 源码核对）**：`SceneTree::process` 在帧开始（`_process` 之前）做 FTI 第 1 遍，
+在 `_process` 与空闲回调之后做第 2 遍，渲染使用第 2 遍。`get_global_transform_interpolated()` 对可见节点返回第 1 遍缓存，
+**不包含本帧 `_process` 中改过的局部变换**（character.position 偏移、模型偏航），所以晚一帧；骨骼修改器（延迟骨骼更新）在两遍之间运行，
+`TwoBoneIK3D` 用 `skeleton.get_global_transform_interpolated()` 把目标变到骨架空间 → 目标错位，误差随视觉偏移的帧间变化而变，**这就是攀爬手部接触随物理频率变化的原因**。
+修复：`render_xf(n) = 胶囊插值变换 × (胶囊⁻¹ × n.global_transform)`（胶囊只在物理帧移动，第 1 遍缓存是新的）；脚部 IK 与最终姿态快照用 `render_xf`；
+手部 IK 目标经由骨架下的**隐藏**子节点喂入（隐藏节点按需计算 = 最近可见祖先的缓存 × 当前局部），IK 看到的骨架空间目标与我们算的完全一致。

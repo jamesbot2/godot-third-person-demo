@@ -885,6 +885,8 @@ func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary
 	var best := INF
 	var close := 0
 	var pen := 0.0
+	var hpen := 0.0
+	var planted_err := 0.0
 	for n in secs(2.0):
 		if pc.state != PlayerController.State.TRAVERSE:
 			break
@@ -895,14 +897,28 @@ func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary
 			var d := p.distance_to(q)
 			best = minf(best, d)
 			near = near or d < 0.08
+			# wrist joint inside the obstacle (palm is ~3 cm under the wrist)
+			if p.z < z_face and p.z > z_back and p.y < top_y + 0.03:
+				hpen = maxf(hpen, minf(top_y + 0.03 - p.y, minf(z_face - p.z, p.z - z_back)))
+			if _anim.hand_contact[0 if h == "hand_l" else 1]:
+				planted_err = maxf(planted_err, absf(p.y - top_y - 0.03))
 		if near:
 			close += 1
-		for f in ["foot_l", "foot_r", "ball_l", "ball_r"]:
-			var p := _bone_world(f)
+		for f in ClipSampler.SOLE:
+			# SOLE point (joint minus sole depth), not the joint: a joint 2 cm
+			# above the top can still have the shoe 0.5-7 cm inside it
+			var p := _bone_world(f) - Vector3(0, ClipSampler.SOLE[f], 0)
 			if p.z < z_face and p.z > z_back and p.y < top_y:
 				pen = maxf(pen, minf(top_y - p.y, minf(z_face - p.z, p.z - z_back)))
+		if OS.has_environment("TRACE_TRAVERSE"):
+			var hl := _bone_world("hand_l"); var hr := _bone_world("hand_r")
+			var fl := _bone_world("foot_l"); var fr := _bone_world("foot_r")
+			var bl := _bone_world("ball_l"); var br := _bone_world("ball_r")
+			print("TR u=%.2f ct=%.3f hl=(%.2f %.3f %.2f) hr=(%.2f %.3f %.2f) fl=(%.2f %.2f) fr=(%.2f %.2f) bl=(%.2f %.2f) br=(%.2f %.2f) cap=(%.2f %.2f) w=%.2f/%.2f" % [
+				_anim.get_traverse_progress(), _anim._tr_clip_t, hl.x, hl.y - top_y, hl.z, hr.x, hr.y - top_y, hr.z,
+				fl.y - top_y, fl.z, fr.y - top_y, fr.z, bl.y - top_y, bl.z, br.y - top_y, br.z, pc.global_position.y, pc.global_position.z, _anim.hand_w[0], _anim.hand_w[1]])
 		await tick()
-	return {"hand": best, "hand_frames": close, "pen": pen}
+	return {"hand": best, "hand_frames": close, "pen": pen, "hpen": hpen, "planted_err": planted_err}
 
 
 ## Per tick while GROUND: sole clearance of the LOWER foot over the real
@@ -1072,8 +1088,9 @@ func t_anim() -> void:
 	var v := await _traverse_contact(L.VAULT_H, L.VAULT_Z, L.VAULT_Z - L.VAULT_T)
 	release_all()
 	await tick(secs(1.0))
-	check("anim_vault_contact", v["hand"] < 0.12 and v["pen"] < 0.04,
-		"closest hand-to-wall-top=%.3f m  max foot penetration=%.3f m" % [v["hand"], v["pen"]])
+	# round 3: tightened from hand<0.12 / pen<0.04 (joint) to palm-level contact
+	check("anim_vault_contact", v["hand"] < 0.04 and v["planted_err"] < 0.01 and v["hpen"] < 0.02 and v["pen"] < 0.02,
+		"closest hand-to-wall-top=%.3f m  planted wrist err=%.3f m  hand penetration=%.3f m  max sole penetration=%.3f m" % [v["hand"], v["planted_err"], v["hpen"], v["pen"]])
 	await place(Vector3(L.MANTLE_X, 0.02, L.MANTLE_Z + 1.0))
 	press("move_forward")
 	await tick(secs(0.4))
@@ -1082,7 +1099,7 @@ func t_anim() -> void:
 	var m := await _traverse_contact(L.MANTLE_H, L.MANTLE_Z, L.MANTLE_Z - 3.0)
 	release_all()
 	await tick(secs(0.8))
-	check("anim_mantle_contact", m["hand"] < 0.08 and m["hand_frames"] >= secs(0.15) and m["pen"] < 0.04,
-		"closest hand-to-ledge=%.3f m  frames within 8 cm=%d  max foot penetration=%.3f m" % [m["hand"], m["hand_frames"], m["pen"]])
+	check("anim_mantle_contact", m["hand"] < 0.04 and m["hand_frames"] >= secs(0.3) and m["planted_err"] < 0.01 and m["hpen"] < 0.02 and m["pen"] < 0.025,
+		"closest hand-to-ledge=%.3f m  frames within 8 cm=%d (%.2f s)  planted wrist err=%.3f m  hand penetration=%.3f m  max sole penetration=%.3f m" % [m["hand"], m["hand_frames"], m["hand_frames"] / float(Engine.physics_ticks_per_second), m["planted_err"], m["hpen"], m["pen"]])
 	check("anim_traverse_states", saw_vault and saw_mantle and _anim.anim_state == "ground", "vault=%s mantle=%s end=%s" % [saw_vault, saw_mantle, _anim.anim_state])
 

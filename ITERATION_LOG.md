@@ -62,10 +62,22 @@
 - 权重只在 GROUND/ground 动画为 1（淡入 10/s、淡出 30/s，避免攀爬时脚穿入台面），瞬移时 reset()。
 - 测试 86/86 @30/60/120 Hz。`FOOTIK_OFF=1` 环境变量可关闭脚部 IK 做 A/B。
 
+## Cycle 7 — Round 3：翻越/攀爬（真实 CC0 片段 + 接触驱动）
+
+- 资源：Drawcall Market 免费再分发的 Quaternius UAL2 Source 级 CC0 单片段（safety vault、climb up 2m、转身/侧移/后退），
+  `tools/fetch_drawcall.sh` curl 获取，`tools/retarget_drawcall.gd` 用 Jog_Fwd 双形式标定的常量骨局部偏移重定向。注意其付费层来源（THIRD_PARTY）。
+- `ClipSampler` 离线采样片段接触点；视觉根按“片段手落在台面 / 片段鞋底落在台面”放置，片段时间由轨迹进度驱动。
+- **根因**：攀爬手部接触随物理频率变化 = `get_global_transform_interpolated()` 返回 FTI 第 1 遍缓存，不含本帧 `_process` 改的视觉偏移，
+  `TwoBoneIK3D` 与脚部 IK 的空间晚一帧（详见 MOVEMENT_SPEC §9.y）。修复：`render_xf()` + 骨架下隐藏的 IK 目标喂入节点。
+  攀爬手接触时长 0.20/0.18/0.32 s → 0.43/0.43/0.43 s。
+- 脚：鞋底深度常量、地面/顶面/前立面钳制、`_find_back_face` 后沿射线；翻越鞋底穿入 0.067 → 0。
+- 手：伸手路径先升后入（不扫过台沿角，0.09 → 0）；超出臂长时手权重淡出（不再满权重悬空 4–7 cm）。
+- 测试收紧（见 TEST_REPORT），86/86 @30/60/120 Hz。
+
 ## 可恢复状态（2026-11-03）
 
 - 分支 `dev/movement-system`，PR #1（**不要合并**）。所有代码已推送；测试 86/86 @30/60/120 Hz（`tests/results/`）。
-- Round 3 进度：优先级 1（脚部 IK）已完成；接下来 2 翻越/攀爬、3 起停/转身/侧移、4 翻滚入口。
+- Round 3 进度：优先级 1（脚部 IK）、2（翻越/攀爬接触）已完成；接下来 3 起停/转身/侧移（片段已烘焙：jog/walk_left/right/bwd、turn90_l/r、turn180_l/r，尚未接入）、4 翻滚入口。
 - 重新录制：见 README“测试”一节（DISPLAY=:17，llvmpipe）。联系表脚本在运行机 `/workspace/eval/sheet.py`（不在仓库中）。
 - 未验收（需 M2 真机）：所有动态观感，尤其是转身/侧移/后退、楼梯/坡道、翻越手部接触、攀爬。
 

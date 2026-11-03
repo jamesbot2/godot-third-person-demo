@@ -1,0 +1,23 @@
+Quaternius - Universal Animation Library 2 "Source" tier clips
+redistributed by Drawcall Market (https://market.drawcall.ai)
+
+License: CC0 1.0 Universal (Public Domain Dedication)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Each clip page (https://market.drawcall.ai/asset/<slug>) and the README.md
+inside each downloaded zip state: "Quaternius Universal Animation Library 2
+Source CC0 humanoid animation ... Source:
+https://quaternius.com/packs/universalanimationlibrary2.html"
+
+Note: on quaternius.com these clips belong to the PAID "Source" tier of
+UAL2. The Drawcall pages offer the individual clips as free downloads
+(no login, no payment) and label them CC0. Nothing was paid. CC0 permits
+redistribution regardless of the original sales channel; we credit
+Quaternius anyway.
+
+Clips used (slug@version):
+safety-vault-root-motion@1.0.4, climb-ledge@1.0.5, climb-up-2m-root-motion@1.0.4,
+jog-fwd-loop@1.0.8 (calibration only), jog-left-loop@1.0.6, jog-right-loop@1.0.6,
+jog-bwd-loop@1.0.6, walk-l-loop@1.0.3, walk-right-loop@1.0.4, walk-bwd-loop@1.0.3,
+turn90-l@1.0.5, turn90-right@1.0.5, turn180-left-root-motion-alternate-2@1.0.3,
+turn180-r-rm@1.0.3

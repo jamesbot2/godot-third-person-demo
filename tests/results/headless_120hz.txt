@@ -24,8 +24,6 @@ RESULT|PASS|step_up_0.35|h=0.35 reached=true y_on_top=0.351 max_y=0.354 max_vy=0
 RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.402 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_block_0.50|h=0.50 reached=false y_on_top=0.001 max_y=0.001 max_vy=0.00 air_ticks=0 t=-1.00s
 RESULT|PASS|step_down_0.15|y=0.000 air_ticks=0
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|step_down_0.25|y=0.000 air_ticks=0
 RESULT|PASS|step_down_0.35|y=0.000 air_ticks=0
 RESULT|PASS|step_down_0.40|y=0.000 air_ticks=0
@@ -98,7 +96,7 @@ RESULT|PASS|fuzz_no_stuck_action_state|longest SLIDE/ROLL/TRAVERSE run=0.59s
 RESULT|PASS|anim_setup|bones=65 active=true
 METRIC|anim_idle_foot_y|0.0240
 RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.024 tpose=false
-METRIC|anim_walk_slip_p90|0.0000
+METRIC|anim_walk_slip_p90|0.0001
 METRIC|anim_walk_slip_med|0.0000
 METRIC|anim_walk_min_foot_y|0.0236
 METRIC|anim_walk_slip_drift|0.0000
@@ -113,18 +111,18 @@ METRIC|anim_sprint_slip_med|0.0000
 METRIC|anim_sprint_min_foot_y|0.0235
 METRIC|anim_sprint_slip_drift|0.0153
 RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.02m/s n=34 min_foot_y=0.024
-METRIC|anim_stairs_foot_pen|0.0000
-METRIC|anim_stairs_foot_gap_med|0.0009
-METRIC|anim_stairs_foot_gap_p90|0.0634
-RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.001 m p90=0.063 m  max penetration=0.000 m  n=780 max_y=1.80
+METRIC|anim_stairs_foot_pen|0.0006
+METRIC|anim_stairs_foot_gap_med|0.0000
+METRIC|anim_stairs_foot_gap_p90|0.0663
+RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.066 m  max penetration=0.001 m  n=780 max_y=1.80
 METRIC|anim_ramp20_foot_pen|0.0010
-METRIC|anim_ramp20_foot_gap_med|0.0116
-METRIC|anim_ramp20_foot_gap_p90|0.0559
-RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.012 m p90=0.056 m  max penetration=0.001 m  n=600 max_y=1.00
+METRIC|anim_ramp20_foot_gap_med|0.0126
+METRIC|anim_ramp20_foot_gap_p90|0.0572
+RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.013 m p90=0.057 m  max penetration=0.001 m  n=600 max_y=1.00
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.36
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
 RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.05
-RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.086 m  max foot penetration=0.009 m
-RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.007 m  frames within 8 cm=38  max foot penetration=0.035 m
+RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.026 m  planted wrist err=0.000 m  hand penetration=0.001 m  max sole penetration=0.000 m
+RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=52 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.020 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
 SUMMARY|hz=120|pass=86|fail=0

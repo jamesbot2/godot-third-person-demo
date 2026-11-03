@@ -36,3 +36,17 @@
 | 旧的程序化灰盒人形（本仓库）| 被替换：方块肢体、程序化姿态，不满足“真人感”要求。 |
 
 已知资源缺口（CC0 Standard 包中没有，靠程序化补偿，见 MOVEMENT_SPEC §9）：专门的起步/停步/原地转身/侧移片段、真正的翻越（vault）片段、真正的攀上台沿（mantle）片段。翻越/攀爬是用 `ClimbUp_1m`（爬坡循环）+ `NinjaJump_Idle` 收腿姿态 + 手部 IK + 视觉根偏移拼出来的。
+
+## 美术资源（Round 3 新增：翻越/攀爬/转身/侧移片段）
+
+| 资源 | 来源 URL | 许可证 | 仓库中的形式 |
+|---|---|---|---|
+| Quaternius Universal Animation Library 2 “Source” 级单片段（经 Drawcall Market 再分发）：safety-vault-root-motion、climb-ledge、climb-up-2m-root-motion、jog-fwd-loop（仅用于重定向标定）、jog-left/right/bwd-loop、walk-l/right/bwd-loop、turn90-l、turn90-right、turn180-left-root-motion-alternate-2、turn180-r-rm | 每个片段页 `https://market.drawcall.ai/asset/<slug>`，下载 `https://market.drawcallcontent.com/zips/<slug>@<版本>.zip`（版本见 `tools/fetch_drawcall.sh`）；原作者 https://quaternius.com/packs/universalanimationlibrary2.html | CC0 1.0（片段页与 zip 内 README 均写明 “CC0”；记录见 `assets/licenses/Quaternius_UAL2_Source_via_Drawcall.txt`）| 重定向后写入 `assets/animations/ual_clips.res` |
+
+- **如实说明**：这些片段在 quaternius.com 属于 UAL2 的**付费 “Source” 级**。Drawcall Market 免登录、免费提供单片段下载并标注 CC0；我们没有付费。
+  CC0 允许再分发，与原始销售渠道无关；仍署名 Quaternius。若用户对来源有顾虑，可删除这些片段回退到 Round 2 的 Standard 片段（代码需相应回退）。
+- 获取：`tools/fetch_drawcall.sh`（curl，无需浏览器/登录），带 sha256 前缀校验。原始 zip/glb 未提交。
+- 重定向：`tools/retarget_drawcall.gd`。Drawcall 片段是去掉蒙皮的规范化人形层级（无根骨）；同一 Quaternius 源骨架只做了旋转重定基，
+  因此每根骨有常量局部偏移 O_b，用两种形式都有的 Jog_Fwd（UAL1 原生 vs jog-fwd-loop）测出并核对其恒定性，再应用到其它片段。
+  片段本身无根骨 → 没有可剥离的根运动；位移只在盆骨轨道，表现层按接触点放视觉根（MOVEMENT_SPEC §9.y），控制器仍是唯一位移权威。
+- 已知资源缺口更新：翻越、攀上台沿已使用真实片段；原地转身、侧移/后退片段已烘焙进 `ual_clips.res`（是否接入见 ITERATION_LOG）；起步/停步专用片段仍没有。

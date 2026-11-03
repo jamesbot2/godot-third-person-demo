@@ -50,8 +50,26 @@ const ROLL_T0 := 0.36
 const ROLL_T1 := 1.25
 const SLIDE_T0 := 0.30
 const SLIDE_T1 := 0.83
-const CLIMB_T0 := 0.10
-const CLIMB_T1 := 0.667
+# Traverse clips (CC0 Quaternius UAL2 "Source" clips, retargeted by
+# tools/retarget_drawcall.gd). Clip times (s) read off the contact analysis
+# printed by tools/retarget_drawcall.gd --traj=<slug>.
+## safety vault: right hand planted on the top from VAULT_PLANT to VAULT_RELEASE
+const VAULT_PLANT := 0.07
+const VAULT_RELEASE := 0.48
+const VAULT_END := 0.733
+## climb up (2 m clip; lower ledges skip its crouch-jump): hands on the ledge
+## from MANTLE_GRAB, right released ~MANTLE_REL_R, left ~MANTLE_REL_L; feet
+## carry the body on the top from MANTLE_FEET.
+const MANTLE_T0 := 0.24
+const MANTLE_GRAB := 0.32
+const MANTLE_REL_R := 0.84
+const MANTLE_REL_L := 0.95
+const MANTLE_FEET := 0.91
+const MANTLE_END := 1.30
+## wrist (hand bone) height above the surface the palm rests on
+const PALM_H := 0.03
+const HAND_INSET := 0.06
+const FEET_BONES: PackedStringArray = ["foot_l", "foot_r", "ball_l", "ball_r"]
 
 # ------------------------------------------------- presentation params ---
 ## Everything the animation layer reads from physics, recomputed each frame.
@@ -117,6 +135,18 @@ var _tr_h := 0.0
 var _tr_top := 0.0
 var _tr_face := Vector3.ZERO
 var _tr_fwd := Vector3.FORWARD
+var arm_ik_r: SkeletonModifier3D
+var _arm_len := 0.5
+var _tr_reach := 1.0                 # mantle reach-in weight (1 = planted)
+var _ik_tf_world := [Vector3.ZERO, Vector3.ZERO]
+var hand_contact := [false, false]    # hand IK fully on AND target on the plant
+var hand_w := [0.0, 0.0]            # per-hand IK weight [l, r]
+var _plant_set := [false, false]
+var _tr_clip_t := 0.0               # clip time of the active traverse clip
+var _vault_tail := false            # vault clip finishing after the controller left TRAVERSE
+var _tr_edge_f := 0.0               # obstacle face, along _tr_fwd (m)
+var _cs_vault: ClipSampler
+var _cs_mantle: ClipSampler
 
 
 func _ready() -> void:
@@ -132,11 +162,13 @@ func _ready() -> void:
 	skeleton.add_child(pose_mod)
 	foot_ik = FootIKScript.new()
 	foot_ik.name = "FootIK"
+	foot_ik.space_provider = self
 	skeleton.add_child(foot_ik)
 	if _pc:
 		foot_ik.collision_mask = _pc.collision_mask
 		foot_ik.exclude = [_pc.get_rid()]
 	_setup_arm_ik()
+	_sample_traverse_clips()
 	# Modifier results (lean/warp/IK) only exist while the skeleton is being
 	# finalised; snapshot the FINAL pose so tests/debug measure what is drawn.
 	skeleton.skeleton_updated.connect(_snapshot_final_pose)
@@ -168,11 +200,30 @@ func _ready() -> void:
 var _final_pose: Array[Transform3D] = []
 
 
+var _final_xf := Transform3D.IDENTITY
+
+
 func _snapshot_final_pose() -> void:
 	var n := skeleton.get_bone_count()
 	_final_pose.resize(n)
 	for i in n:
 		_final_pose[i] = skeleton.get_bone_global_pose(i)
+	# measure in the frame that is actually drawn (see render_xf)
+	_final_xf = render_xf(skeleton)
+
+
+
+## Transform a node under the controller is DRAWN with this frame.
+## Physics interpolation is on: the renderer uses the capsule's interpolated
+## transform times the CURRENT local chain (SceneTreeFTI's second pass, after
+## _process). Node3D.get_global_transform_interpolated() instead returns the
+## value cached by the FIRST pass at frame start, i.e. without the local
+## changes made in _process this frame (visual root offset, yaw) -- one frame
+## stale. Skeleton modifiers run between the two passes, so they must use this.
+func render_xf(n: Node3D) -> Transform3D:
+	if _pc == null:
+		return n.global_transform
+	return _pc.get_global_transform_interpolated() * (_pc.global_transform.affine_inverse() * n.global_transform)
 
 
 ## World-space position of a bone in the final (post-modifier) pose that is
@@ -180,28 +231,59 @@ func _snapshot_final_pose() -> void:
 func get_final_bone_world(bone_name: String) -> Vector3:
 	var i := skeleton.find_bone(bone_name)
 	var pose := _final_pose[i] if i >= 0 and i < _final_pose.size() else skeleton.get_bone_global_pose(i)
-	return (skeleton.global_transform * pose).origin
+	var xf := _final_xf if i < _final_pose.size() else render_xf(skeleton)
+	return (xf * pose).origin
 
 
 func _setup_arm_ik() -> void:
-	var ik := TwoBoneIK3D.new()
-	ik.name = "ArmIK"
-	skeleton.add_child(ik)   # after BodyPoseModifier: runs on the final pose
-	ik.set_setting_count(2)
+	# one modifier per arm so each hand has its own contact weight
 	for i in 2:
 		var sd := "l" if i == 0 else "r"
+		var ik := TwoBoneIK3D.new()
+		ik.name = "ArmIK_" + sd
+		skeleton.add_child(ik)   # after BodyPoseModifier: runs on the final pose
+		ik.set_setting_count(1)
 		var t := Marker3D.new(); t.name = "HandTarget_" + sd; t.top_level = true
 		var pl := Marker3D.new(); pl.name = "ElbowPole_" + sd; pl.top_level = true
 		add_child(t); add_child(pl)
 		_ik_t.append(t); _ik_p.append(pl)
-		ik.set_root_bone_name(i, "upperarm_" + sd)
-		ik.set_middle_bone_name(i, "lowerarm_" + sd)
-		ik.set_end_bone_name(i, "hand_" + sd)
-		ik.set_target_node(i, ik.get_path_to(t))
-		ik.set_pole_node(i, ik.get_path_to(pl))
-	ik.influence = 0.0
-	ik.active = false
-	arm_ik = ik
+		# TwoBoneIK3D reads target/pole via get_global_transform_interpolated()
+		# and resolves them in the skeleton's get_global_transform_interpolated(),
+		# both frame-start caches that miss this frame's _process changes. A
+		# HIDDEN child of the skeleton is evaluated on demand as
+		# skeleton_cache * local, so the IK sees exactly `local` in skeleton
+		# space, whatever the cache holds; _feed_arm_ik() sets local from the
+		# drawn transform.
+		var tf := Node3D.new(); tf.name = "HandTargetFeed_" + sd; tf.visible = false
+		var pf := Node3D.new(); pf.name = "ElbowPoleFeed_" + sd; pf.visible = false
+		skeleton.add_child(tf); skeleton.add_child(pf)
+		_ik_tf.append(tf); _ik_pf.append(pf)
+		ik.set_root_bone_name(0, "upperarm_" + sd)
+		ik.set_middle_bone_name(0, "lowerarm_" + sd)
+		ik.set_end_bone_name(0, "hand_" + sd)
+		ik.set_target_node(0, ik.get_path_to(tf))
+		ik.set_pole_node(0, ik.get_path_to(pf))
+		ik.influence = 0.0
+		ik.active = false
+		if i == 0:
+			arm_ik = ik
+		else:
+			arm_ik_r = ik
+
+
+func _sample_traverse_clips() -> void:
+	# skeleton space -> this node's axes, origin at the visual root (character)
+	var m := Transform3D.IDENTITY
+	var n: Node = skeleton
+	while n != self:
+		m = (n as Node3D).transform * m
+		n = n.get_parent()
+	m.origin -= character.position
+	var bones: PackedStringArray = ["hand_l", "hand_r", "foot_l", "foot_r", "ball_l", "ball_r", "pelvis", "upperarm_l", "upperarm_r"]
+	_cs_vault = ClipSampler.sample(skeleton, m, CLIP_LIB.get_animation("vault_safety"), bones)
+	_cs_mantle = ClipSampler.sample(skeleton, m, CLIP_LIB.get_animation("climb_up_2m"), bones)
+	_arm_len = skeleton.get_bone_rest(skeleton.find_bone("lowerarm_l")).origin.length() \
+		+ skeleton.get_bone_rest(skeleton.find_bone("hand_l")).origin.length()
 
 
 # ----------------------------------------------------------------- tree ---
@@ -280,12 +362,10 @@ func _build_tree() -> AnimationNodeStateMachine:
 	rl.connect_node("output", 0, _seeked(rl, "r", "roll", Vector2.ZERO))
 	sm.add_node("roll", rl, Vector2(600, 400))
 	var mt := AnimationNodeBlendTree.new()
-	mt.connect_node("output", 0, _seeked(mt, "c", "climb", Vector2.ZERO))
+	mt.connect_node("output", 0, _seeked(mt, "c", "climb_up_2m", Vector2.ZERO))
 	sm.add_node("mantle", mt, Vector2(900, 200))
 	var vt := AnimationNodeBlendTree.new()
-	var vc := _seeked(vt, "c", "climb", Vector2.ZERO)
-	var vtuck := _seeked(vt, "tuck", "ninja_air", Vector2(0, 200))
-	vt.connect_node("output", 0, _blend2(vt, "tuck_mix", vc, vtuck, Vector2(700, 100)))
+	vt.connect_node("output", 0, _seeked(vt, "c", "vault_safety", Vector2.ZERO))
 	sm.add_node("vault", vt, Vector2(900, 400))
 	var xfade := {"ground": 0.18, "jump": 0.08, "air": 0.2, "slide": 0.12, "slide_exit": 0.1,
 		"roll": 0.14, "mantle": 0.1, "vault": 0.1}
@@ -407,10 +487,13 @@ func update_presentation(dt: float) -> void:
 	p_slope_deg = rad_to_deg(_pc.get_floor_angle()) if _pc.is_on_floor() else 0.0
 
 	_update_state_machine(st)
+	# traverse first: it sets the clip time that _drive_actions seeks to (one
+	# frame of lag here = a dt-proportional hand error, i.e. Hz dependence)
+	_drive_traverse_contact(dt, st)
 	_drive_ground(dt)
 	_drive_actions(dt)
-	_drive_traverse_contact(dt, st)
 	_drive_procedural(dt, st)
+	_feed_arm_ik()   # last: after every transform change of this frame
 	_prev_ctrl_state = st
 
 
@@ -426,7 +509,7 @@ func _update_state_machine(st: String) -> void:
 		"AIR":
 			if anim_state == "jump" and _state_t < 0.32 and p_vy > 0.5:
 				pass
-			elif anim_state == "vault" and _state_t < 0.05:
+			elif anim_state == "vault" and _vault_tail and _tr_clip_t < VAULT_END - 0.02:
 				pass
 			else:
 				_travel("air")
@@ -501,24 +584,45 @@ func _drive_actions(_dt: float) -> void:
 			_p("roll/r_seek/seek_request", lerpf(ROLL_T0, ROLL_T1, u))
 			_p("roll/r_ts/scale", 0.0)
 		"mantle":
-			var u := get_traverse_progress()
-			_p("mantle/c_seek/seek_request", lerpf(CLIMB_T0, CLIMB_T1, u))
+			_p("mantle/c_seek/seek_request", _tr_clip_t)
 			_p("mantle/c_ts/scale", 0.0)
 		"vault":
-			var u := get_traverse_progress()
-			_p("vault/c_seek/seek_request", lerpf(CLIMB_T0, 0.42, minf(u / 0.45, 1.0)))
+			_p("vault/c_seek/seek_request", _tr_clip_t)
 			_p("vault/c_ts/scale", 0.0)
-			_p("vault/tuck_seek/seek_request", 0.4)
-			_p("vault/tuck_ts/scale", 0.0)
-			_p("vault/tuck_mix/blend_amount", smoothstep(0.2, 0.45, u))
 
 
-## Vault / mantle presentation: keep the visual body low until the hands are
-## planted on the obstacle edge, then let it catch up with the capsule (pure
-## visual offset, the controller path is untouched), and pull the hands onto
-## the real edge with two-bone arm IK while they can reach it.
+## Vault / mantle presentation (pure visual: the controller path is untouched).
+## The traverse clips are in-place, so the VISUAL root is placed from the
+## clip's own contacts: while a hand is planted the root sits where that
+## hand (as posed by the clip on this skeleton) lands on the real obstacle
+## top/edge; while the feet carry the body the root sits where the lowest
+## foot lands on the top (or the start floor). The clip time is driven by the
+## controller's traverse progress, so the result does not depend on the
+## physics rate. Two-bone arm IK then pins each planted hand to a fixed world
+## point on the top for the remaining (small) error.
+var _tail_y0 := 0.0
+var _tr_back_f := INF               # obstacle back face, along _tr_fwd (INF = deep ledge)
+var _ik_tf: Array[Node3D] = []
+var _ik_pf: Array[Node3D] = []
+
+
+## Far face of the obstacle along _tr_fwd: ray from beyond, back toward the
+## front face, just under the top. INF when the top continues (a ledge).
+func _find_back_face(cap: Vector3, edge_f: float) -> float:
+	var cap_f := cap.dot(_tr_fwd)
+	var y := _tr_top - 0.05
+	var a := cap + _tr_fwd * (edge_f + 2.5 - cap_f); a.y = y
+	var b := cap + _tr_fwd * (edge_f + 0.01 - cap_f); b.y = y
+	var q := PhysicsRayQueryParameters3D.create(a, b, _pc.collision_mask, [_pc.get_rid()])
+	var hit := _pc.get_world_3d().direct_space_state.intersect_ray(q)
+	return INF if hit.is_empty() else (hit["position"] as Vector3).dot(_tr_fwd)
+
+
 func _drive_traverse_contact(dt: float, st: String) -> void:
 	var trav := st == "VAULT" or st == "MANTLE"
+	# offsets are relative to the RENDERED (interpolated) capsule, so the drawn
+	# root lands exactly where the clip contact puts it at any physics rate
+	var cap := _pc.get_global_transform_interpolated().origin
 	if trav and (_prev_ctrl_state != st or _tr_h == 0.0):
 		var pts: Array = _pc._tr_points
 		_tr_fwd = _pc._tr_dir
@@ -526,54 +630,153 @@ func _drive_traverse_contact(dt: float, st: String) -> void:
 		_tr_h = (pts[1] as Vector3).y - _tr_start_y
 		_tr_top = (pts[1] as Vector3).y - 0.06
 		_tr_face = (pts[1] as Vector3) + _tr_fwd * _pc.body_radius
-	if not trav:
+		_tr_edge_f = _tr_face.dot(_tr_fwd)
+		_tr_back_f = _find_back_face(cap, _tr_edge_f)
+		_plant_set = [false, false]
+		_tr_clip_t = 0.0
+		_vault_tail = false
+	var right := _tr_fwd.cross(Vector3.UP).normalized()
+	var cap_f := cap.dot(_tr_fwd)
+	var tw := [0.0, 0.0]   # target hand weights
+	hand_contact = [false, false]
+	if trav:
+		_tr_reach = 1.0
+		var u := get_traverse_progress()
+		var cs: ClipSampler
+		var t: float
+		var root_y: float
+		var root_f: float
+		var hand := 1   # hand driving the root
+		if st == "VAULT":
+			cs = _cs_vault
+			if u < 0.15:
+				t = VAULT_PLANT * u / 0.15
+			elif u < 0.75:
+				t = lerpf(VAULT_PLANT, VAULT_RELEASE, (u - 0.15) / 0.6)
+			else:
+				t = lerpf(VAULT_RELEASE, 0.55, (u - 0.75) / 0.25)
+			var wc := smoothstep(0.0, VAULT_PLANT, t) * (1.0 - smoothstep(VAULT_RELEASE, 0.6, t))
+			root_y = lerpf(_tr_start_y, _tr_top + PALM_H - cs.at("hand_r", t).y, wc)
+			root_f = lerpf(cap_f, _tr_edge_f + HAND_INSET + cs.at("hand_r", t).z, wc)
+			tw[1] = smoothstep(VAULT_PLANT - 0.04, VAULT_PLANT, t) * (1.0 - smoothstep(VAULT_RELEASE - 0.03, VAULT_RELEASE + 0.04, t))
+		else:
+			cs = _cs_mantle
+			hand = 0
+			t = lerpf(MANTLE_T0, MANTLE_END, u)
+			var w_h := smoothstep(MANTLE_T0, MANTLE_GRAB, t)
+			var w_f := smoothstep(MANTLE_FEET - 0.05, MANTLE_FEET + 0.05, t)
+			var r_h := _tr_top + PALM_H - cs.at("hand_l", t).y
+			var r_f := _tr_top - cs.sole_min(t)
+			root_y = lerpf(lerpf(_tr_start_y, r_h, w_h), r_f, w_f)
+			root_f = lerpf(cap_f, _tr_edge_f + HAND_INSET + cs.at("hand_l", t).z, w_h)
+			root_f = lerpf(root_f, cap_f, smoothstep(MANTLE_FEET, MANTLE_END, t))
+			# reach in over the whole hang-up so the hands come OVER the lip
+			# (approach target above/behind the plant, see _tr_reach below)
+			# instead of the FK hand sweeping through the face corner
+			var reach := smoothstep(MANTLE_T0, MANTLE_GRAB, t)
+			var on := smoothstep(0.0, 0.25, reach)   # target starts AT the FK hand: no jump
+			tw[0] = on * (1.0 - smoothstep(MANTLE_REL_L - 0.05, MANTLE_REL_L + 0.03, t))
+			tw[1] = on * (1.0 - smoothstep(MANTLE_REL_R - 0.05, MANTLE_REL_R + 0.03, t))
+			_tr_reach = reach
+		# soles never below the start floor ...
+		root_y = maxf(root_y, _tr_start_y - cs.sole_min(t))
+		# ... nor poking through the front face below the top (clip start
+		# poses put a toe ~2-4 cm past the face when the jump fires close)
+		var push := 0.0
+		for b in ClipSampler.SOLE:
+			var bp := cs.at(b, t)
+			if root_y + bp.y - ClipSampler.SOLE[b] < _tr_top - 0.01:
+				push = maxf(push, root_f - bp.z - (_tr_edge_f - 0.01))
+		root_f -= push
+		# ... nor inside the obstacle: any foot whose predicted position is over
+		# the top (between front face and back face) keeps its sole on/above it
+		for b in ClipSampler.SOLE:
+			var bp := cs.at(b, t)
+			var bf := root_f - bp.z
+			if bf > _tr_edge_f - 0.02 and bf < _tr_back_f + 0.02:
+				root_y = maxf(root_y, _tr_top + ClipSampler.SOLE[b] - bp.y)
+		# hand off to the capsule at the very end (no pop when the state changes)
+		var w_end := smoothstep(0.9, 1.0, u) if st == "MANTLE" else 0.0
+		_tr_off = lerpf(root_y - cap.y, 0.0, w_end)
+		_tr_fwd_off = lerpf(root_f - cap_f, 0.0, w_end)
+		_tr_clip_t = t
+		for i in 2:
+			var hn := "hand_l" if i == 0 else "hand_r"
+			if tw[i] > 0.0 and not _plant_set[i]:
+				_plant_set[i] = true
+				var hx := cs.at(hn, t).x
+				_ik_t[i].global_position = Vector3(cap.x, _tr_top + PALM_H, cap.z) + right * hx \
+					+ _tr_fwd * (_tr_edge_f + HAND_INSET - cap_f)
+			if not _plant_set[i]:
+				continue
+			var plant: Vector3 = _ik_t[i].global_position
+			# out of reach (the visual root was lifted, e.g. to keep the feet
+			# out of the obstacle): the hand leaves the surface instead of the
+			# IK reporting full weight with a hovering wrist
+			var sh := _clip_world(cs, "upperarm_l" if i == 0 else "upperarm_r", t, cap, cap_f, root_y, root_f, right)
+			tw[i] *= 1.0 - smoothstep(0.0, 0.03, sh.distance_to(plant) - _arm_len * 0.99)
+			# drawn target: from the clip (FK) hand UP over the lip, then in
+			# onto the plant, so the reach never sweeps through the face corner
+			var fk := _clip_world(cs, hn, t, cap, cap_f, root_y, root_f, right)
+			var r := _tr_reach
+			var tgt := fk.lerp(plant, smoothstep(0.35, 1.0, r))
+			tgt.y = lerpf(fk.y, plant.y + 0.10 * (1.0 - r), smoothstep(0.0, 0.6, r))
+			# below the lip the target stays in front of the face; the
+			# allowance grows as it rises over the top (soft, no snap)
+			var f := (tgt - cap).dot(_tr_fwd) + cap_f
+			var f_max := _tr_edge_f - 0.04 + maxf(0.0, tgt.y - (plant.y - PALM_H - 0.01)) * 3.0
+			if f > f_max:
+				tgt -= _tr_fwd * (f - f_max)
+			_ik_tf_world[i] = tgt
+			hand_contact[i] = r > 0.999 and tw[i] > 0.99
+		_tail_y0 = cap.y
+	elif anim_state == "vault" and st == "AIR":
+		# finish the vault clip while the capsule drops off the far side: clip
+		# time follows the fall, the visual root stays on the floor
+		if not _vault_tail:
+			_vault_tail = true
+			_tail_y0 = cap.y
+		var fall := clampf((_tail_y0 - cap.y) / maxf(_tail_y0 - _tr_start_y, 0.1), 0.0, 1.0)
+		_tr_clip_t = maxf(_tr_clip_t, lerpf(0.55, VAULT_END, fall))
+		_tr_off = minf(0.0, _tr_start_y - cap.y)
+		_tr_fwd_off = lerpf(_tr_fwd_off, 0.0, 1.0 - exp(-10.0 * dt))
+	else:
 		_tr_h = 0.0
+		_vault_tail = false
 		_tr_off = lerpf(_tr_off, 0.0, 1.0 - exp(-16.0 * dt))
 		_tr_fwd_off = lerpf(_tr_fwd_off, 0.0, 1.0 - exp(-16.0 * dt))
-		_tr_lean = lerpf(_tr_lean, 0.0, 1.0 - exp(-10.0 * dt))
-		hand_ik_weight = lerpf(hand_ik_weight, 0.0, 1.0 - exp(-20.0 * dt))
-		_tr_off_prev = _tr_off
-		_tr_fwd_off_prev = _tr_fwd_off
-	else:
-		var u := get_traverse_progress()
-		var y := _pc.global_position.y
-		var plant_in := 0.0
-		var plant_out := 1.0
-		var inset := 0.07
-		if st == "MANTLE":
-			# hang/reach -> pull: visual root rises later than the capsule
-			var w := _tr_start_y + _tr_h * smoothstep(0.2, 0.95, u)
-			_tr_off = minf(0.0, w - y)
-			_tr_lean = deg_to_rad(28.0) * smoothstep(0.1, 0.4, u) * (1.0 - smoothstep(0.75, 1.0, u))
-			# the capsule keeps its radius off the wall; the chest should not
-			_tr_fwd_off = 0.2 * smoothstep(0.35, 0.6, u) * (1.0 - smoothstep(0.8, 1.0, u))
-			plant_in = smoothstep(0.02, 0.14, u)
-			plant_out = 1.0 - smoothstep(0.62, 0.82, u)
-		else:
-			# speed vault: hips skim ~0.35 m over the top while hands push off it
-			var bump := smoothstep(0.15, 0.4, u) * (1.0 - smoothstep(0.7, 0.95, u))
-			var dip := maxf(0.0, y - (_tr_top + 0.3 - 0.91))
-			_tr_off = -dip * bump
-			_tr_lean = deg_to_rad(38.0) * bump
-			_tr_fwd_off = 0.0
-			plant_in = smoothstep(0.12, 0.3, u)
-			plant_out = 1.0 - smoothstep(0.6, 0.78, u)
-			inset = 0.12
-		hand_ik_weight = plant_in * plant_out
-		var right := _tr_fwd.cross(Vector3.UP).normalized()
-		_tr_off_prev = _tr_off
-		_tr_fwd_off_prev = _tr_fwd_off
-		for i in 2:
-			var side := -1.0 if i == 0 else 1.0
-			var tp := Vector3(_tr_face.x, _tr_top + 0.045, _tr_face.z) + _tr_fwd * inset + right * side * 0.2
-			_ik_t[i].global_position = tp
-			# elbows: behind and outside the hand, slightly down (push-up)
-			_ik_p[i].global_position = tp - _tr_fwd * 0.6 + right * side * 0.45 - Vector3.UP * 0.1
-			_ik_t[i].global_basis = Basis.looking_at(-_tr_fwd, Vector3.UP)
-	arm_ik.influence = clampf(hand_ik_weight, 0.0, 1.0)
-	arm_ik.active = hand_ik_weight > 0.001
+	_tr_lean = 0.0
+	_tr_off_prev = _tr_off
+	_tr_fwd_off_prev = _tr_fwd_off
+	var iks := [arm_ik, arm_ik_r]
+	for i in 2:
+		# fast in (already reached by the clip), fast out
+		hand_w[i] = tw[i] if trav else lerpf(hand_w[i], 0.0, 1.0 - exp(-20.0 * dt))
+		var side := -1.0 if i == 0 else 1.0
+		var tp: Vector3 = _ik_t[i].global_position
+		if not (trav and _plant_set[i]):
+			_ik_tf_world[i] = tp
+		_ik_p[i].global_position = tp - _tr_fwd * 0.6 + right * side * 0.45 - Vector3.UP * 0.1
+		_ik_t[i].global_basis = Basis.looking_at(-_tr_fwd, Vector3.UP)
+		iks[i].influence = clampf(hand_w[i], 0.0, 1.0)
+		iks[i].active = hand_w[i] > 0.001
+	hand_ik_weight = maxf(hand_w[0], hand_w[1])
 	var lf := global_basis.inverse() * (_tr_fwd * _tr_fwd_off)
 	character.position = Vector3(lf.x, _vis_y + _tr_off, lf.z)
+
+
+## World position of a sampled clip joint for the current visual root.
+func _clip_world(cs: ClipSampler, b: String, t: float, cap: Vector3, cap_f: float, root_y: float, root_f: float, right: Vector3) -> Vector3:
+	var bp := cs.at(b, t)
+	return Vector3(cap.x, root_y + bp.y, cap.z) + right * bp.x + _tr_fwd * (root_f - bp.z - cap_f)
+
+
+## Feed the arm IK its targets in skeleton space of the DRAWN skeleton.
+func _feed_arm_ik() -> void:
+	var inv := render_xf(skeleton).affine_inverse()
+	for i in 2:
+		_ik_tf[i].transform = inv * Transform3D(_ik_t[i].global_basis, _ik_tf_world[i])
+		_ik_pf[i].transform = inv * _ik_p[i].global_transform
 
 
 func get_traverse_progress() -> float:
