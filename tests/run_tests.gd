@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 97
+const EXPECTED_TOTAL := 98
 
 
 func want(name: String) -> bool:
@@ -1373,6 +1373,55 @@ func t_anim() -> void:
 	metric("anim_roll_dive_span_m", dive_span)
 	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9 and min_head > 0.0 and max_float < 0.2 and head_v_max < 25.0 and dive_span < 1.25,
 		"roll=%s model_tilt=%.3f min_head_h=%.2f dive: lowest contact off floor max=%.3f m pelvis max=%.2f m  head speed in body frame max=%.1f m/s  pitched head-feet span max=%.2f m" % [saw_roll, max_tilt, min_head, max_float, max_pelvis, head_v_max, dive_span])
+	# round 4: 180 deg sharp turn at jog speed -- legs must not cross
+	# (feet / knees measured along the hip axis thigh_l->thigh_r; <0 = crossed)
+	await place(Vector3(0, 0.02, 14))
+	press("move_forward")
+	await tick(secs(1.2))
+	release("move_forward"); press("move_back")
+	var tmin_foot := INF
+	var tmin_knee := INF
+	var tmax_fyaw := 0.0
+	var tmax_valgus := -INF
+	for n in secs(1.0):
+		await tick()
+		var hl := _bone_world("thigh_l"); var hr := _bone_world("thigh_r")
+		var ax := (hr - hl); ax.y = 0.0
+		if ax.length() < 0.01:
+			continue
+		ax = ax.normalized()
+		var fsep := (_bone_world("foot_r") - _bone_world("foot_l")).dot(ax)
+		var ksep := (_bone_world("calf_r") - _bone_world("calf_l")).dot(ax)
+		var bfw := Vector3.UP.cross(ax)
+		var fyaw := 0.0
+		for sd in ["l", "r"]:
+			var fv := _bone_world("ball_" + sd) - _bone_world("foot_" + sd); fv.y = 0.0
+			if fv.length() > 0.1:   # flat-ish foot only (a pointed swing foot has no yaw)
+				fyaw = maxf(fyaw, rad_to_deg(bfw.angle_to(fv.normalized())))
+		tmax_fyaw = maxf(tmax_fyaw, fyaw)
+		# knee valgus: knee inside the hip->ankle line (m, >0 = knock-kneed)
+		var kin := -INF
+		for sd in [["l", -1.0], ["r", 1.0]]:
+			var T := _bone_world("thigh_" + sd[0]); var K := _bone_world("calf_" + sd[0]); var A := _bone_world("foot_" + sd[0])
+			var u := (A - T).normalized()
+			var outp: Vector3 = ax * float(sd[1]); outp = (outp - u * outp.dot(u)).normalized()
+			var kp := K - T; kp -= u * kp.dot(u)
+			kin = maxf(kin, -kp.dot(outp))
+		tmax_valgus = maxf(tmax_valgus, kin)
+		tmin_foot = minf(tmin_foot, fsep)
+		tmin_knee = minf(tmin_knee, ksep)
+		if OS.has_environment("TRACE_TURN"):
+			var dd: Dictionary = _anim.get_anim_debug()
+			print("TURN %d kin=%.3f fyaw=%.0f fsep=%.3f ksep=%.3f warp=%.0f yaw=%.0f v=%.2f back=%s" % [n, kin, fyaw, fsep, ksep, dd["warp_deg"], rad_to_deg(pc.facing_yaw), Vector2(pc.velocity.x, pc.velocity.z).length(), _anim._backward])
+	release_all()
+	await tick(secs(0.5))
+	metric("anim_turn180_min_foot_sep_m", tmin_foot)
+	metric("anim_turn180_min_knee_sep_m", tmin_knee)
+	metric("anim_turn180_max_foot_yaw_deg", tmax_fyaw)
+	metric("anim_turn180_max_knee_valgus_m", tmax_valgus)
+	check("anim_turn180_legs", tmin_foot > 0.1 and tmin_knee > 0.1 and tmax_valgus < 0.005,
+		"min foot sep=%.3f knee sep=%.3f valgus=%.3f" % [tmin_foot, tmin_knee, tmax_valgus])
+	print("INFO|turn180 legs: min foot sep=%.3f min knee sep=%.3f max foot yaw=%.0f max knee valgus=%.3f" % [tmin_foot, tmin_knee, tmax_fyaw, tmax_valgus])
 	# vault + mantle map to their own states
 	await place(Vector3(L.VAULT_X, 0.02, L.VAULT_Z + 3.0))
 	press("move_forward")

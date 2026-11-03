@@ -334,6 +334,7 @@ func _process_modification() -> void:
 		_solve_leg(sk, th, ca, ft, target)
 		var fq := foot_basis.get_rotation_quaternion().slerp(fbasis[i].get_rotation_quaternion(), w)
 		_set_global_basis(sk, ft, Basis(fq))
+		_knee_out(sk, th, ca, ft, i, w)
 		if w > 0.05:
 			_post_clamp(sk, space, xf, inv, ft, ba, w)
 		pl[i] = planted[i]
@@ -375,6 +376,46 @@ func _post_clamp(sk: Skeleton3D, space: PhysicsDirectSpaceState3D, xf: Transform
 			if ax.length() > 1e-4:
 				var q := Quaternion(ax.normalized(), (e1 - e0) * w)
 				_set_global_basis(sk, ft, Basis(q) * _gp(sk, ft).basis.orthonormalized())
+
+
+## Knee tracking: the jog clip (plus the hip warp) lets the knee drift up to
+## ~3 cm inside the hip->ankle line (knock-kneed, worst right after a sharp
+## turn). Swing the leg about the hip->ankle axis so the knee sits at least
+## knee_out_min outside that line; the ankle lies on the axis so it does not
+## move, and the foot keeps its world orientation.
+var knee_out_min := 0.012
+
+
+func _knee_out(sk: Skeleton3D, th: int, ca: int, ft: int, i: int, w: float) -> void:
+	var T := _gp(sk, th).origin
+	var K := _gp(sk, ca).origin
+	var A := _gp(sk, ft).origin
+	var hip := _gp(sk, _bone("thigh_r")).origin - _gp(sk, _bone("thigh_l")).origin
+	hip.y = 0.0
+	if hip.length() < 0.01 or A.distance_to(T) < 0.1:
+		return
+	var u := (A - T).normalized()
+	var outp := hip.normalized() * (1.0 if i == 1 else -1.0)
+	outp = outp - u * outp.dot(u)
+	if outp.length() < 0.1:
+		return
+	outp = outp.normalized()
+	var kp := K - T
+	kp -= u * kp.dot(u)
+	var r := kp.length()
+	if r < 0.02:
+		return   # leg (nearly) straight: no knee plane to swing
+	var want := minf(knee_out_min, r * 0.5)
+	var o := kp.dot(outp)
+	if o >= want:
+		return
+	var ang := (asin(clampf(want / r, -1.0, 1.0)) - asin(clampf(o / r, -1.0, 1.0))) * w
+	var q := Quaternion(u, ang)
+	if (q * kp).dot(outp) < (Quaternion(u, -ang) * kp).dot(outp):
+		q = Quaternion(u, -ang)
+	var fb := _gp(sk, ft).basis.orthonormalized()
+	_rot_global(sk, th, q)
+	_set_global_basis(sk, ft, fb)
 
 
 func _solve_leg(sk: Skeleton3D, th: int, ca: int, ft: int, target: Vector3) -> void:

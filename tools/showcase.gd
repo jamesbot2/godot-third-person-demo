@@ -261,6 +261,11 @@ func _run() -> void:
 		move_world = Vector3(-1, 0, 0)
 		await frames(0.15); await shot("turn180_mid")
 		await closeup("sharp_turn180", Vector3(1.8, 1.0, 1.8), 0.5, 36.0)
+		# same instant from the front of the hips (the rear-quarter view above
+		# overlaps the fore/aft feet and reads as crossed legs)
+		var hip: Vector3 = anim.get_final_bone_world("thigh_r") - anim.get_final_bone_world("thigh_l")
+		hip.y = 0.0
+		await closeup("sharp_turn180_front", Vector3.UP.cross(hip.normalized()) * 2.4 + Vector3(0, 0.2, 0), 0.5, 36.0)
 		await frames(0.9)
 		release_all(); await frames(0.5)
 		# strafe: hold aim, facing follows the camera (camera looks -Z)
