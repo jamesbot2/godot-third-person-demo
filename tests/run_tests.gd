@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 99
+const EXPECTED_TOTAL := 100
 
 
 func want(name: String) -> bool:
@@ -820,13 +820,20 @@ func t_crates() -> void:
 	press("move_forward")
 	var max_y := 0.0
 	var max_vy := 0.0
+	var max_tilt := 0.0
 	for n in secs(2.0):
 		await tick()
 		max_y = maxf(max_y, pc.global_position.y)
 		max_vy = maxf(max_vy, pc.velocity.y)
+		max_tilt = maxf(max_tilt, rad_to_deg(light.global_basis.y.angle_to(Vector3.UP)))
 	release_all()
 	var moved := light.global_position.distance_to(lp0)
 	check("crate_push_light", moved > 0.5 and max_y < 0.3 and max_vy < 1.5, "crate moved=%.2fm player max_y=%.3f max_vy=%.2f" % [moved, max_y, max_vy])
+	# Round 5: the push must slide the crate (not tumble it) by the same
+	# distance at every tick rate. Walk 2 m at 4.2 m/s then push at
+	# push_speed_max (2 m/s) for the rest of 2 s -> ~3.1 m; was
+	# 3.45/3.40/2.31 m at 30/60/120 Hz with the crate tumbling at 30/60.
+	check("crate_push_rate_independent", absf(moved - 3.12) < 0.15 and max_tilt < 5.0, "crate moved=%.2fm (want 3.12+-0.15) max tilt=%.1f deg" % [moved, max_tilt])
 	var hp0 := heavy.global_position
 	await place(hp0 + Vector3(0, 0.02 - hp0.y, 2.0))
 	press("move_forward")

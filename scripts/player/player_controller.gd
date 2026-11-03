@@ -139,6 +139,8 @@ const STATE_NAMES := ["GROUND", "AIR", "SLIDE", "ROLL", "TRAVERSE"]
 @export_group("Push")
 ## Max horizontal force the character can exert on props (N). ~450 N = firm shove.
 @export var push_force_max := 450.0
+## Top speed a pushed prop is driven to (m/s); also bounded by our intended speed.
+@export var push_speed_max := 2.0
 
 # ---------------------------------------------------------------- runtime ---
 var state: int = State.GROUND
@@ -916,6 +918,12 @@ func _restore_stance_after_low() -> void:
 		is_crouched = true   # stay at low height until there is room
 
 
+## How far ahead of the capsule a prop still counts as "under our hands".
+## 0.04 m lost contact on alternate ticks at 120 Hz (the crate slid a few cm
+## clear between player ticks) and the crate moved ~10% less than at 30 Hz.
+const PUSH_REACH := 0.10
+
+
 func _push_props(intended_hv: Vector3, dt: float) -> void:
 	# Force-limited push: a person can exert ~push_force_max on an object.
 	# The force drives the prop toward our *intended* speed (the clipped
@@ -929,7 +937,7 @@ func _push_props(intended_hv: Vector3, dt: float) -> void:
 	var ih := intended_hv.length()
 	if ih > 0.1:
 		var probe := KinematicCollision3D.new()
-		if test_move(global_transform, intended_hv / ih * 0.04, probe, 0.001, true, 1):
+		if test_move(global_transform, intended_hv / ih * PUSH_REACH, probe, 0.001, true, 1):
 			contacts.append(probe)
 	var done := {}
 	for c in contacts:
@@ -942,13 +950,35 @@ func _push_props(intended_hv: Vector3, dt: float) -> void:
 		if push_dir.length() < 0.1:
 			continue
 		push_dir = push_dir.normalized()
-		var v_rel := intended_hv.dot(push_dir) - rb.linear_velocity.dot(push_dir)
-		if v_rel <= 0.0:
+		# Velocity servo with a force budget (Round 5). The old version
+		# applied a saturated 450 N impulse at centre height; the crate's
+		# response then depended on the tick rate (3.45/3.40/2.31 m at
+		# 30/60/120 Hz, tumbling end over end at 30/60 because a centre
+		# push on a mu=1 cube tips before it slides). Now: drive the
+		# crate's along-push speed toward min(intended, push_speed_max)
+		# with the acceleration the force budget leaves after floor
+		# friction, a = F/m - mu*g (heavy crates: a <= 0 -> they resist),
+		# and pre-compensate the friction the solver removes this tick.
+		# Crates use friction 0.5 (PM_crate in main.tscn): at mu >= w/(2h)
+		# = 1 a sliding cube tips over its leading edge whatever pushes it.
+		var target := minf(intended_hv.dot(push_dir), push_speed_max)
+		var lv := rb.linear_velocity
+		var v_along := lv.dot(push_dir)
+		if target <= v_along:
 			continue
-		var force := minf(v_rel * rb.mass / dt * 0.5, push_force_max)
-		var at := c.get_position() - rb.global_position
-		at.y = 0.0   # push at centre height: slide rather than tip
-		rb.apply_impulse(push_dir * force * dt, at)
+		var mu := 1.0
+		if rb.physics_material_override:
+			mu = rb.physics_material_override.friction
+		var g := float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
+		var a_max := push_force_max / rb.mass - mu * g
+		if a_max <= 0.0:
+			continue
+		var v_new := minf(v_along + a_max * dt, target)
+		lv += push_dir * (v_new - v_along + mu * g * dt)
+		rb.linear_velocity = lv
+		rb.sleeping = false
+		if OS.has_environment("PUSH_DEBUG"):
+			print("PUSH v_along=%.2f v_new=%.2f target=%.2f hv=%.2f" % [v_along, v_new, target, Vector2(velocity.x, velocity.z).length()])
 
 
 func respawn() -> void:
