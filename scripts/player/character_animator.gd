@@ -41,6 +41,7 @@ static func clip_library() -> AnimationLibrary:
 	if not want or not ResourceLoader.exists(EXTRA_LIB_PATH):
 		_lib_cache = CLIP_LIB
 		_lib_has_extras = false
+		_add_authored(_lib_cache)
 		print("INFO|anim_library=core (CC0 Standard clips only)")
 		return _lib_cache
 	var lib := AnimationLibrary.new()
@@ -52,8 +53,17 @@ static func clip_library() -> AnimationLibrary:
 			lib.add_animation(n, ex.get_animation(n))
 	_lib_has_extras = lib.has_animation("vault_safety") and lib.has_animation("climb_up_2m")
 	_lib_cache = lib
+	_add_authored(lib)
 	print("INFO|anim_library=", "core+local_extras" if _lib_has_extras else "core")
 	return lib
+## In-memory authored variants of CC0 clips (see roll_authoring.gd).
+static func _add_authored(lib: AnimationLibrary) -> void:
+	if not lib.has_animation("roll_tuck"):
+		# ROLL_UNTUCKED=1: A/B measurement against the raw source clip
+		var raw := OS.get_environment("ROLL_UNTUCKED") == "1"
+		lib.add_animation("roll_tuck", lib.get_animation("roll").duplicate() if raw else RollAuthoring.build(lib.get_animation("roll")))
+
+
 const BodyPoseModifierScript := preload("res://scripts/player/body_pose_modifier.gd")
 const FootIKScript := preload("res://scripts/player/foot_ik_modifier.gd")
 
@@ -415,7 +425,7 @@ func _build_tree() -> AnimationNodeStateMachine:
 	sm.add_node("slide_exit", sx, Vector2(300, 400))
 	# roll / mantle / vault: seeked from controller progress
 	var rl := AnimationNodeBlendTree.new()
-	rl.connect_node("output", 0, _seeked(rl, "r", "roll", Vector2.ZERO))
+	rl.connect_node("output", 0, _seeked(rl, "r", "roll_tuck", Vector2.ZERO))
 	sm.add_node("roll", rl, Vector2(600, 400))
 	var mt := AnimationNodeBlendTree.new()
 	mt.connect_node("output", 0, _seeked(mt, "c", "climb_up_2m" if has_extras else "climb", Vector2.ZERO))
@@ -1197,7 +1207,7 @@ func _sample_roll(m: Transform3D) -> void:
 	var bones := PackedStringArray(ROLL_RADIUS.keys())
 	for b in ClipSampler.SOLE:
 		bones.append(b)
-	var cs := ClipSampler.sample(skeleton, m, clip_library().get_animation("roll"), bones)
+	var cs := ClipSampler.sample(skeleton, m, clip_library().get_animation("roll_tuck"), bones)
 	_cs_roll = cs
 	var raw := PackedFloat32Array()
 	for i in ROLL_DROP_N + 1:

@@ -1290,6 +1290,10 @@ func t_anim() -> void:
 		"ball_l": 0.024, "ball_r": 0.024, "foot_l": 0.093, "foot_r": 0.093}
 	var head_prev := Vector3.INF
 	var head_v_max := 0.0
+	# "flat dive" = the body stretched out (head far from the feet) while the
+	# trunk is pitched over (head not above the pelvis). A tucked roll keeps
+	# the knees at the chest, so head-to-feet span stays short.
+	var dive_span := 0.0
 	for n in secs(0.6):
 		await tick()
 		max_tilt = maxf(max_tilt, absf(_anim.rotation.x) + absf(_anim.rotation.z))
@@ -1309,13 +1313,19 @@ func t_anim() -> void:
 			if OS.has_environment("ROLL_DEBUG"):
 				print("RF u=%.2f st=%.3f float=%.3f pelvis=%.2f head=%.2f drop=%.3f anim=%s clip_head=%.2f clip_pel=%.2f" % [pc.roll_time / pc.roll_duration, _anim._state_t, low, _bone_world("pelvis").y - fy, _bone_world("Head").y - fy, _anim._roll_drop_s, _anim.anim_state, _anim._cs_roll.at("Head", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y, _anim._cs_roll.at("pelvis", lerpf(_anim.ROLL_T0, _anim.ROLL_T1, pc.roll_time / pc.roll_duration)).y])
 			max_pelvis = maxf(max_pelvis, _bone_world("pelvis").y - fy)
+		if pc.state == PlayerController.State.ROLL and pc.roll_time < pc.roll_duration * 0.6:
+			var hw := _bone_world("Head")
+			if hw.y - _bone_world("pelvis").y < 0.3:
+				var fm := (_bone_world("foot_l") + _bone_world("foot_r")) * 0.5
+				dive_span = maxf(dive_span, hw.distance_to(fm))
 	release_all()
 	metric("anim_roll_float_max_m", max_float)
 	metric("anim_roll_pelvis_max_m", max_pelvis)
 	metric("anim_roll_min_head_m", min_head)
 	metric("anim_roll_head_v_max", head_v_max)
-	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9 and min_head > 0.0 and max_float < 0.2 and head_v_max < 25.0,
-		"roll=%s model_tilt=%.3f min_head_h=%.2f dive: lowest contact off floor max=%.3f m pelvis max=%.2f m  head speed in body frame max=%.1f m/s" % [saw_roll, max_tilt, min_head, max_float, max_pelvis, head_v_max])
+	metric("anim_roll_dive_span_m", dive_span)
+	check("anim_roll", saw_roll and max_tilt < 0.001 and min_head < 0.9 and min_head > 0.0 and max_float < 0.2 and head_v_max < 25.0 and dive_span < 1.25,
+		"roll=%s model_tilt=%.3f min_head_h=%.2f dive: lowest contact off floor max=%.3f m pelvis max=%.2f m  head speed in body frame max=%.1f m/s  pitched head-feet span max=%.2f m" % [saw_roll, max_tilt, min_head, max_float, max_pelvis, head_v_max, dive_span])
 	# vault + mantle map to their own states
 	await place(Vector3(L.VAULT_X, 0.02, L.VAULT_Z + 3.0))
 	press("move_forward")
