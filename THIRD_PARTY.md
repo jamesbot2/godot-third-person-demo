@@ -63,4 +63,7 @@ Round 3 前期（提交 `9e0060c`）把 Drawcall Market（https://market.drawcal
   `9e0060c` 不会出现在 `main` 的历史里。**不要用普通 merge 或 rebase merge 合并 PR #1。**
 - 如需正式使用这些片段：直接向 Quaternius 购买 Source/Pro 包，并按购买时附带的许可证决定能否把烘焙结果放进公开仓库。
 
+Round 4 新增的派生片段（`roll_tuck`、`walk_bwd`/`jog_bwd`/`sprint_bwd`，见 `scripts/player/roll_authoring.gd`、
+`scripts/player/backward_gait.gd`）只在运行时、在内存中由已提交的 CC0 Standard 片段计算出来，没有引入新的第三方数据，也不读取 extras。
+
 Standard 包（UBC、UAL1 Standard、UAL2 Standard）的结论不变：CC0，直接从作者的 itch.io 页面以 $0 获得。

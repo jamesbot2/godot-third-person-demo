@@ -26,6 +26,8 @@ RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.401 max_vy=0
 RESULT|PASS|step_block_0.50|h=0.50 reached=false y_on_top=0.001 max_y=0.001 max_vy=0.00 air_ticks=0 t=-1.00s
 RESULT|PASS|step_down_0.15|y=0.001 air_ticks=0
 RESULT|PASS|step_down_0.25|y=0.001 air_ticks=0
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|step_down_0.35|y=0.001 air_ticks=0
 RESULT|PASS|step_down_0.40|y=0.001 air_ticks=0
 METRIC|stairs_up_time_s|1.0333
@@ -50,8 +52,6 @@ METRIC|jump_airtime_s|0.6833
 RESULT|PASS|jump_full_height|apex=0.900 expect=0.90 airtime=0.683s
 METRIC|jump_tap_apex_m|0.3931
 RESULT|PASS|jump_variable_tap|tap apex=0.393
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|no_bhop_gain|max h-speed over 6 chained jumps=6.800
 RESULT|PASS|coyote_0.07s|delay=0.07 jumped=true vy=4.33
 RESULT|PASS|coyote_0.20s|delay=0.20 jumped=false vy=-4.65
@@ -140,40 +140,57 @@ METRIC|anim_aim_fwd_clip_slip_med|0.9469
 METRIC|anim_aim_fwd_slip_med|0.0000
 METRIC|anim_aim_fwd_lock_pops|0.0000
 METRIC|anim_aim_fwd_leg_err_deg|0.0000
+METRIC|anim_aim_fwd_swing_knee_lead_m|0.3656
 RESULT|PASS|anim_aim_fwd|v=3.00 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=42 | IK off: clip slip med=0.95 (32%) drift=-0.07
 METRIC|anim_strafe_left_clip_slip_med|0.9905
 METRIC|anim_strafe_left_slip_med|0.0000
 METRIC|anim_strafe_left_lock_pops|0.0000
 METRIC|anim_strafe_left_leg_err_deg|0.0001
+METRIC|anim_strafe_left_swing_knee_lead_m|0.3641
 RESULT|PASS|anim_strafe_left|v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=44 | IK off: clip slip med=0.99 (37%) drift=-0.02
 METRIC|anim_strafe_right_clip_slip_med|0.9245
 METRIC|anim_strafe_right_slip_med|0.0000
 METRIC|anim_strafe_right_lock_pops|0.0000
 METRIC|anim_strafe_right_leg_err_deg|0.0001
+METRIC|anim_strafe_right_swing_knee_lead_m|0.3595
 RESULT|PASS|anim_strafe_right|v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=39 | IK off: clip slip med=0.92 (34%) drift=-0.20
-METRIC|anim_backpedal_clip_slip_med|0.8582
+METRIC|anim_backpedal_clip_slip_med|0.8496
 METRIC|anim_backpedal_slip_med|0.0000
 METRIC|anim_backpedal_lock_pops|0.0000
 METRIC|anim_backpedal_leg_err_deg|0.0000
-RESULT|PASS|anim_backpedal|v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=43 | IK off: clip slip med=0.86 (40%) drift=0.22
+METRIC|anim_backpedal_swing_knee_lead_m|0.2975
+RESULT|PASS|anim_backpedal_gait|max swing knee lead ahead of hips=0.30 m (raw reversed forward clip 0.36)
+RESULT|PASS|anim_backpedal|v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=43 | IK off: clip slip med=0.85 (39%) drift=0.48
 METRIC|anim_diag_fl_clip_slip_med|0.9267
 METRIC|anim_diag_fl_slip_med|0.0000
 METRIC|anim_diag_fl_lock_pops|0.0000
 METRIC|anim_diag_fl_leg_err_deg|0.0000
+METRIC|anim_diag_fl_swing_knee_lead_m|0.3672
 RESULT|PASS|anim_diag_fl|v=2.91 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=40 | IK off: clip slip med=0.93 (32%) drift=-0.10
-METRIC|anim_diag_br_clip_slip_med|0.8928
+METRIC|anim_diag_br_clip_slip_med|0.9075
 METRIC|anim_diag_br_slip_med|0.0000
 METRIC|anim_diag_br_lock_pops|0.0000
 METRIC|anim_diag_br_leg_err_deg|0.0000
-RESULT|PASS|anim_diag_br|v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=38 | IK off: clip slip med=0.89 (39%) drift=-0.09
+METRIC|anim_diag_br_swing_knee_lead_m|0.3080
+RESULT|PASS|anim_diag_br|v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=39 | IK off: clip slip med=0.91 (39%) drift=0.34
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.41
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
-METRIC|anim_roll_float_max_m|0.1237
-METRIC|anim_roll_pelvis_max_m|0.8472
+METRIC|anim_roll_float_max_m|0.1605
+METRIC|anim_roll_pelvis_max_m|0.8025
 METRIC|anim_roll_min_head_m|0.0714
-METRIC|anim_roll_head_v_max|18.1663
-RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.07 dive: lowest contact off floor max=0.124 m pelvis max=0.85 m  head speed in body frame max=18.2 m/s
+METRIC|anim_roll_head_v_max|17.5573
+METRIC|anim_roll_dive_span_m|1.1164
+RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.07 dive: lowest contact off floor max=0.160 m pelvis max=0.80 m  head speed in body frame max=17.6 m/s  pitched head-feet span max=1.12 m
+METRIC|anim_turn180_min_foot_sep_m|0.1778
+METRIC|anim_turn180_min_knee_sep_m|0.2392
+METRIC|anim_turn180_max_foot_yaw_deg|31.9716
+METRIC|anim_turn180_max_knee_valgus_m|-0.0120
+RESULT|PASS|anim_turn180_legs|min foot sep=0.178 knee sep=0.239 valgus=-0.012
+INFO|turn180 legs: min foot sep=0.178 min knee sep=0.239 max foot yaw=32 max knee valgus=-0.012
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.030 m  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
-RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=19 (0.32 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
+RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=21 (0.35 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
+METRIC|anim_vault_pop_m|0.0951
+METRIC|anim_mantle_pop_m|0.1068
+RESULT|PASS|anim_traverse_pops|largest per-frame 2nd difference of body points: vault 0.095 m (hand_l, 5.7 m/s velocity jump)  mantle 0.107 m (hand_r, 6.4 m/s)
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=60|pass=96|fail=0
+SUMMARY|hz=60|pass=99|fail=0

@@ -20,8 +20,6 @@ METRIC|turn90_overshoot_m|0.2596
 RESULT|PASS|turn_90|t=0.175s overshoot=0.26m vmax=4.20
 RESULT|PASS|no_instant_turn|max turn rate 898 deg/s
 RESULT|PASS|step_up_0.15|h=0.15 reached=true y_on_top=0.151 max_y=0.153 max_vy=0.00 air_ticks=0 t=0.93s
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|step_up_0.25|h=0.25 reached=true y_on_top=0.251 max_y=0.253 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.35|h=0.35 reached=true y_on_top=0.351 max_y=0.354 max_vy=0.00 air_ticks=0 t=0.93s
 RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.402 max_vy=0.00 air_ticks=0 t=0.93s
@@ -140,40 +138,57 @@ METRIC|anim_aim_fwd_clip_slip_med|0.8994
 METRIC|anim_aim_fwd_slip_med|0.0000
 METRIC|anim_aim_fwd_lock_pops|0.0000
 METRIC|anim_aim_fwd_leg_err_deg|0.0000
+METRIC|anim_aim_fwd_swing_knee_lead_m|0.3656
 RESULT|PASS|anim_aim_fwd|v=3.00 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=83 | IK off: clip slip med=0.90 (30%) drift=-0.01
 METRIC|anim_strafe_left_clip_slip_med|0.9503
 METRIC|anim_strafe_left_slip_med|0.0000
 METRIC|anim_strafe_left_lock_pops|0.0000
 METRIC|anim_strafe_left_leg_err_deg|0.0001
+METRIC|anim_strafe_left_swing_knee_lead_m|0.3627
 RESULT|PASS|anim_strafe_left|v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=90 | IK off: clip slip med=0.95 (35%) drift=0.05
 METRIC|anim_strafe_right_clip_slip_med|0.9064
 METRIC|anim_strafe_right_slip_med|0.0000
 METRIC|anim_strafe_right_lock_pops|0.0000
 METRIC|anim_strafe_right_leg_err_deg|0.0001
+METRIC|anim_strafe_right_swing_knee_lead_m|0.3619
 RESULT|PASS|anim_strafe_right|v=2.70 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=87 | IK off: clip slip med=0.91 (34%) drift=-0.04
-METRIC|anim_backpedal_clip_slip_med|0.8378
+METRIC|anim_backpedal_clip_slip_med|0.4139
 METRIC|anim_backpedal_slip_med|0.0000
 METRIC|anim_backpedal_lock_pops|0.0000
 METRIC|anim_backpedal_leg_err_deg|0.0000
-RESULT|PASS|anim_backpedal|v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=94 | IK off: clip slip med=0.84 (39%) drift=0.15
+METRIC|anim_backpedal_swing_knee_lead_m|0.3818
+RESULT|FAIL|anim_backpedal_gait|max swing knee lead ahead of hips=0.38 m (raw reversed forward clip 0.36)
+RESULT|PASS|anim_backpedal|v=2.16 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=86 | IK off: clip slip med=0.41 (19%) drift=0.05
 METRIC|anim_diag_fl_clip_slip_med|0.8789
 METRIC|anim_diag_fl_slip_med|0.0000
 METRIC|anim_diag_fl_lock_pops|0.0000
 METRIC|anim_diag_fl_leg_err_deg|0.0000
+METRIC|anim_diag_fl_swing_knee_lead_m|0.3664
 RESULT|PASS|anim_diag_fl|v=2.91 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=76 | IK off: clip slip med=0.88 (30%) drift=0.01
-METRIC|anim_diag_br_clip_slip_med|0.9136
+METRIC|anim_diag_br_clip_slip_med|0.5072
 METRIC|anim_diag_br_slip_med|0.0000
 METRIC|anim_diag_br_lock_pops|0.0000
 METRIC|anim_diag_br_leg_err_deg|0.0000
-RESULT|PASS|anim_diag_br|v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=77 | IK off: clip slip med=0.91 (39%) drift=-0.06
+METRIC|anim_diag_br_swing_knee_lead_m|0.3830
+RESULT|PASS|anim_diag_br|v=2.32 IK on: slip med=0.000 m/s (0% of v) p90=0.00 drift=0.00 pops=0 face_err=0.0deg leg_err=0deg n=75 | IK off: clip slip med=0.51 (22%) drift=0.02
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.36
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
-METRIC|anim_roll_float_max_m|0.1274
-METRIC|anim_roll_pelvis_max_m|0.8967
+METRIC|anim_roll_float_max_m|0.1608
+METRIC|anim_roll_pelvis_max_m|0.8714
 METRIC|anim_roll_min_head_m|0.0663
-METRIC|anim_roll_head_v_max|18.8548
-RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.07 dive: lowest contact off floor max=0.127 m pelvis max=0.90 m  head speed in body frame max=18.9 m/s
+METRIC|anim_roll_head_v_max|18.2824
+METRIC|anim_roll_dive_span_m|1.1256
+RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.07 dive: lowest contact off floor max=0.161 m pelvis max=0.87 m  head speed in body frame max=18.3 m/s  pitched head-feet span max=1.13 m
+METRIC|anim_turn180_min_foot_sep_m|0.1779
+METRIC|anim_turn180_min_knee_sep_m|0.2398
+METRIC|anim_turn180_max_foot_yaw_deg|30.4298
+METRIC|anim_turn180_max_knee_valgus_m|-0.0120
+RESULT|PASS|anim_turn180_legs|min foot sep=0.178 knee sep=0.240 valgus=-0.012
+INFO|turn180 legs: min foot sep=0.178 min knee sep=0.240 max foot yaw=30 max knee valgus=-0.012
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.026 m  planted wrist err=0.000 m  hand penetration=0.001 m  max sole penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=52 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
+METRIC|anim_vault_pop_m|0.2090
+METRIC|anim_mantle_pop_m|0.5706
+RESULT|FAIL|anim_traverse_pops|largest per-frame 2nd difference of body points: vault 0.209 m (foot_r, 25.1 m/s velocity jump)  mantle 0.571 m (hand_r, 68.5 m/s)
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=120|pass=96|fail=0
+SUMMARY|hz=120|pass=97|fail=2

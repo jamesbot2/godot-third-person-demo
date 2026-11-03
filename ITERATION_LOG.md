@@ -99,20 +99,29 @@
 - ClipSampler 骨骼名断言（发现 `"head"` 静默读错骨骼）。
 - 第 3 轮可视化（core）：showcase 加原地转身段 + 28 张特写（SubViewport，不打断视频）。结论见 TEST_REPORT 末节。
 
-## 可恢复状态（2026-11-03，Cycle 10 之后）
+## Cycle 11 — Round 4（f7afe1e, b3a0da9, cd60173, 645732e, 565ca5c, 1c774dd）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推**）。测试 96/96 @30/60/120 Hz，core 与 extras 两种模式（`tests/results/`）。
-- 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`，不在仓库中）；或
+- 所有者决定：用 squash 合并 PR #1 来去掉 9e0060c 中存疑的数据，不改写历史（THIRD_PARTY + PR 正文都有说明）。
+- 翻滚：`roll_tuck` 在入口阶段收腿，头-脚跨度 1.48 → 1.13 m。骨盆最高点没有处理（仍是 0.7–0.9 m）。
+- 翻越/攀爬单帧跳变：只修正真正穿进方块的脚底，修正量经临界阻尼弹簧平滑，淡化改为缓入缓出。速度跳变 13–25 → 5–10 m/s。新增 `anim_traverse_pops`。
+- 180° 急转：`_knee_out`，膝间距 0.19 → 0.24 m，内扣 0.027 → −0.012。新增 `anim_turn180_legs`。（“腿交叉”经查是相机视角造成的，不是真的交叉。）
+- 后退：`BackwardGait`（由 CC0 片段生成），新增 `anim_backpedal_gait`。
+  试过把整段摆动替换成关节空间曲线（蹬地 → 收腿 → 落地）：膝盖靠前时屈膝会让脚贴着地面向后扫（钟摆最低点），IK 关闭时脚尖拖地、单帧落地跳 0.2 m。
+  改为“倒放源片段 + 衰减抬膝”后，实测与后退步态的生物力学（大致是前进的时间反演）一致。
+- 侧移交叉步：没有做。
+- 展示脚本：楼梯下行特写按位置触发，每张特写渲染前都隐藏标签（标签在 setup 之后才建，原来的隐藏没生效），默认输出 round4。
+
+## 可恢复状态（2026-11-03，Cycle 11 之后）
+
+- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 99/99 @30/60/120 Hz；本机 extras 97/99（extras 片段没有通过 traverse_pops 和 backpedal_gait）。
+- 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`）；或
   `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz> [--only=t_anim]`；`UAL_EXTRAS=0` 强制 core。
-- 调试：`TRACE_TRAVERSE=1`（翻越/攀爬 PLAN/TR 行）、`ROLL_DEBUG=1`（翻滚下压表/头速）、`ROLLPROBE=1`（测试内翻滚逐帧骨骼）；`/workspace/eval/jumps.py <log> 0.07`。
-- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round3`，`--only=roll,vault` 只跑某几段）；`closeup()` 用第二个相机出特写；
-  联系表 `/workspace/eval/sheet.py <dir> <out.png> [cols] [width]`。第 3 轮产物在 `/workspace/acceptance/round3/`。
-- Round 3 进度：优先级 1–3 完成（3 为程序化），原地转身完成；优先级 4 翻滚入口改善但未达标（第一阶段仍是鱼跃）。
-- 剩余问题：翻滚第一阶段鱼跃（骨盆最高 0.7–0.9 m；下一步可试：入口时把片段根前倾/骨盆高度按表钳制，或程序化前 0.15 s 下蹲过渡）；
-  180° 急转双腿交叉；core 侧移无交叉步；翻越/攀爬 core 单帧跳变约 0.16 m/帧；推箱子 120 Hz 差 ~30%；楼梯下行脚部特写缺失（showcase 拍摄时机）；
-  extras 方向混合尝试在 git stash `wip-aimed-directional-backup` 与 `/workspace/backup_r3/wip_aimed_directional.patch`。
+- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`（翻滚 A/B）、`BWD_RAW=1`（后退改回倒放前进片段，做 A/B）；
+  `tools/_bwd_probe.gd -- <walk|jog|sprint> [bwd]` 逐帧打印腿部运动学。
+- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round4`）；第 4 轮产物在 `/workspace/acceptance/round4/`。
+- 剩余问题：翻滚骨盆最高 0.7–0.9 m（可试：入口阶段按表限制骨盆高度）；core 侧移没有交叉步；后退只是适度改善（膝前伸 ~0.30 m）；
+  慢跑后退摆动中段腿后摆过快；攀爬起身时手臂甩到头侧；30 Hz 翻越速度跳变 9.6 m/s（门限 12）；推箱子 120 Hz 差约 30%；extras 模式 2 项失败。
 - 未验收（需 M2 真机）：所有动态观感。
-- **未处理**：已推送的 `9e0060c` 中的 `ual_clips.res` 含存疑片段的烘焙数据；改写历史需仓库所有者确认。
 
 ## 下一步优先级
 
