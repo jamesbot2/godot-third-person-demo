@@ -298,6 +298,9 @@ func _run() -> void:
 		move_world = Vector3(1, 0, -1)
 		await frames(0.8); await shot("strafe_diag_side")
 		await closeup("diag_feet", Vector3(2.3, 0.4, 0.0), 0.35)
+		move_world = Vector3(-1, 0, 1)
+		await frames(1.0); await shot("strafe_diag_back_side")
+		await closeup("diag_back_feet", Vector3(2.3, 0.4, 0.0), 0.35)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.4)
 

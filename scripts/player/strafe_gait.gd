@@ -9,7 +9,11 @@ extends RefCounted
 ##  * aim_fwd / aim_bwd: the forward / authored-backward gait blended
 ##    (walk..jog, slerp at normalized phase - what the sync Blend2 plays) at
 ##    the gait weight the aim speed needs; rotated so the LEFT foot contact
-##    is at phase 0.
+##    is at phase 0. Round 6: legs re-solved like the strafe set (no
+##    stagger, softer swing tangents) so the stance foot sweeps exactly the
+##    aim stride (no clip slip at the source; AIM_FB_RAW=1 = old blend).
+##  * all lateral clips: the hips counter-rotate (HIP_YAW) against the
+##    clip's shoulder swing; spine_01 takes the inverse (chest unchanged).
 ##  * strafe_l / strafe_r: CROSS-STEP side gait. Upper body, arms and pelvis
 ##    motion are aim_fwd's own (CC0-derived); the legs are re-solved per key
 ##    with an analytic two-bone IK so the ankles follow an authored lateral
@@ -37,13 +41,24 @@ const Z_LEAD := -0.07
 const BULGE_TRAIL := 0.07
 const BULGE_LEAD := -0.04
 ## stance width scale vs the idle stance
-const NARROW := 0.6
+const NARROW := 0.4
+## swing end tangent scale for the side / diagonal set (1.0 = full stance
+## velocity at lift-off / touchdown; less = less sideways overshoot -> a
+## narrower widest stance)
+const SIDE_TAN := 1.0
+## back diagonals (backward base): stance fraction, lift (m), late lift like
+## the backpedal so the rhythm matches its neighbours
+const BD_DUTY := 0.40
+const BD_LIFT := 0.09
+const BD_SKEW := 1.6
+## hip yaw amplitude (deg) at a pure side step (scaled by |dir.x|), against
+## the clip's shoulder swing
+const HIP_YAW := 7.0
 ## max hip->ankle reach as a fraction of the straight leg
 const REACH := 0.965
 ## round 6 re-posed aim_fwd / aim_bwd (see build): stance fraction, swing
 ## lift (m), stance width scale, stance centre offset along the movement (m;
-## the backpedal plants a little behind the body so the swing knee does not
-## reach forward)
+## 0 measured best for the backpedal swing knee)
 const FB_DUTY := 0.42
 const FB_DUTY_B := 0.38
 const FB_LIFT_F := 0.16
@@ -198,6 +213,7 @@ static func _solve_leg(g: Array, ih: int, ik: int, ia: int, tgt: Vector3, pole: 
 static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vector3, stride: float, unit: float,
 		duty := DUTY, lift := LIFT, narrow := NARROW, c_off := 0.0, tan := 1.0, stagger := true, skew := 1.0) -> Array:
 	var b_pel := skel.find_bone("pelvis")
+	var b_sp := skel.find_bone("spine_01")
 	var ig := _fk(skel, idle_loc)
 	var legs := {}
 	for sd in ["l", "r"]:
@@ -270,7 +286,18 @@ static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vec
 		var par := skel.get_bone_parent(b_pel)
 		var pb: Basis = (gp[par] as Transform3D).basis if par >= 0 else Basis.IDENTITY
 		var pl: Transform3D = loc[b_pel]
-		loc[b_pel] = Transform3D(pl.basis, pl.origin + pb.inverse() * Vector3(0, -dk, 0))
+		# hips counter-rotate under the (camera-locked) chest on lateral
+		# steps: yaw opposite to the clip's shoulder swing, spine_01 takes the
+		# inverse so the chest / arms / aim stay exactly as authored
+		var hy := -HIP_YAW * cross * cos(TAU * float(k) / n) * (-1.0 if dvec.z < -0.01 else 1.0)   # backward base: shoulder swing is phase-flipped
+		var hb := pl.basis
+		if absf(hy) > 1e-5:
+			hb = (pb.inverse() * Basis(Vector3.UP, deg_to_rad(hy)) * pb) * pl.basis
+		loc[b_pel] = Transform3D(hb, pl.origin + pb.inverse() * Vector3(0, -dk, 0))
+		if absf(hy) > 1e-5 and b_sp >= 0:
+			var sp_g: Basis = (gp[b_sp] as Transform3D).basis
+			var pel_g: Basis = pb * hb
+			loc[b_sp] = Transform3D(pel_g.inverse() * sp_g, (loc[b_sp] as Transform3D).origin)
 		var g := _fk(skel, loc)
 		for sd in ["l", "r"]:
 			var L: Dictionary = legs[sd]
@@ -302,7 +329,7 @@ const POINTS := [
 ## walk..jog gait weights for the aim forward / backpedal speed;
 ## side_m / diag_m: authored strides (m per cycle); f_m / b_m: the aim
 ## forward / backpedal strides (m per cycle) the re-posed aim_fwd / aim_bwd sweep.
-static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: float, side_m: float, diag_m: float, unit: float, f_m: float = 2.0, b_m: float = 2.0) -> void:
+static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: float, side_m: float, diag_m: float, unit: float, f_m: float = 2.0, b_m: float = 2.0, diag_b_m: float = 2.0) -> void:
 	if lib.has_animation("strafe_r"):
 		return
 	var walk := lib.get_animation("walk")
@@ -325,5 +352,9 @@ static func build(skel: Skeleton3D, lib: AnimationLibrary, g_f: float, g_b: floa
 			continue
 		var v2: Vector2 = pt[1]
 		var dv := Vector3(-v2.x, 0, v2.y)   # skeleton: right = -X, forward = +Z
-		var st := (side_m if absf(v2.y) < 0.01 else diag_m) / unit
-		lib.add_animation(nm, to_anim(skel, dir_frames(skel, fwd if v2.y >= 0.0 else bwd, idle_loc, dv, st, unit), walk))
+		var back := v2.y < -0.01
+		var st := (side_m if absf(v2.y) < 0.01 else (diag_b_m if back else diag_m)) / unit
+		if back:
+			lib.add_animation(nm, to_anim(skel, dir_frames(skel, bwd, idle_loc, dv, st, unit, BD_DUTY, BD_LIFT, NARROW, 0.0, SIDE_TAN, true, BD_SKEW), walk))
+		else:
+			lib.add_animation(nm, to_anim(skel, dir_frames(skel, fwd, idle_loc, dv, st, unit, DUTY, LIFT, NARROW, 0.0, SIDE_TAN), walk))

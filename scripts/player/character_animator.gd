@@ -96,9 +96,11 @@ const LEN_CWALK := 2.0
 ## aim_fwd / aim_bwd / cross-step strafe_l / strafe_r). AIM_WARP=1 restores
 ## the old orientation-warp strafe for A/B measurement.
 ## Lateral distance per strafe cycle (m): cycle rate = v / this.
-@export var strafe_stride := 1.6
+@export var strafe_stride := 1.3
 ## Distance per cycle of the authored diagonal clips (m).
 @export var diag_stride := 2.0
+## back diagonals (between strafe_stride and the shortened backpedal)
+@export var diag_back_stride := 1.5
 ## aimed backpedal stride vs the forward-gait table stride at its speed
 ## (round 6: shorter, quicker backward steps; the re-posed aim_bwd sweeps
 ## exactly this stride)
@@ -376,7 +378,7 @@ func _build_aim_set() -> void:
 	var gb := _solve_gait(vb * 2.0 / _cadence(vb), 0.0)
 	_aim_stride_f = _stride_at(gf, 0.0)
 	_aim_stride_b = _stride_at(gb, 0.0) * backpedal_stride_scale
-	StrafeGait.build(skeleton, clip_library(), gf, gb, strafe_stride, diag_stride, unit, _aim_stride_f, _aim_stride_b)
+	StrafeGait.build(skeleton, clip_library(), gf, gb, strafe_stride, diag_stride, unit, _aim_stride_f, _aim_stride_b, diag_back_stride)
 	has_aim_set = true
 
 
@@ -436,7 +438,7 @@ func _blend2(bt: AnimationNodeBlendTree, name: String, a: String, b: String, pos
 ## stride per cycle of the aim blend space at blend position `bp` (unit
 ## vector): the blend between the two neighbouring points (45 deg apart)
 func _aim_stride(bp: Vector2) -> float:
-	var st := [_aim_stride_f, diag_stride, strafe_stride, diag_stride, _aim_stride_b, diag_stride, strafe_stride, diag_stride]
+	var st := [_aim_stride_f, diag_stride, strafe_stride, diag_back_stride, _aim_stride_b, diag_back_stride, strafe_stride, diag_stride]
 	var a := fposmod(atan2(bp.x, bp.y), TAU) / (PI / 4.0)
 	var i := int(a) % 8
 	return maxf(lerpf(st[i], st[(i + 1) % 8], a - floorf(a)), 0.3)
