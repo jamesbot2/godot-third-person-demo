@@ -111,22 +111,33 @@
 - 侧移交叉步：没有做。
 - 展示脚本：楼梯下行特写按位置触发，每张特写渲染前都隐藏标签（标签在 setup 之后才建，原来的隐藏没生效），默认输出 round4。
 
-## 可恢复状态（2026-11-03，Cycle 11 之后）
+## Cycle 12 — Round 5（ca1a8a9, ef53970, 517da83, 53da67b, 8105eff, e6dbbe2）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 99/99 @30/60/120 Hz；本机 extras 97/99（extras 片段没有通过 traverse_pops 和 backpedal_gait）。
+- 翻滚：倒立阶段弯背 + 骨盆前倾，按“骨盆离最低接触 ≤ 0.45 m”求解（`ROLL_NOCAP=1` / `ROLL_CAP=` 做 A/B）；入口淡入后骨盆 0.69 → 0.57 m（目标 0.55 未完全达到）。
+- 推箱子：帧率无关的速度伺服 + 箱子摩擦 0.5，30/60/120 Hz 推动 3.13/3.12/3.12 m（原 3.45/3.40/2.31）。新增 `crate_push_rate_independent`。
+- 翻越“越过”特写重新取景；展示默认输出 round5。
+- 攀爬起身：放开的手经 IK 下垂，手腕相对肩 −0.19…−0.23 → −0.31…−0.32 m。新增 `anim_mantle_standup_arms`。
+- 侧移交叉步：`StrafeGait` + BlendSpace2D（8 点）。先试了“前进片段 + 侧移片段”两点混合：斜向步幅不匹配，片段滑步 46–61%，于是补了 4 个斜向片段并按方向插值步幅。
+  余弦摆动在起止处有速度台阶，引起 FootIK 硬跳脱，改为 Hermite 摆动；120 Hz 斜后方仍有 1 次跳脱（脚离地 2.6 cm < PLANT_H 3 cm），改为 sin^0.6 快速抬脚后消除。
+  初版（支撑 0.5、宽度 0.8、步幅 1.7）最宽时两腿分得过开，改为 0.42 / 0.6 / 1.6。
+- core 101/101 @30/60/120；extras 98/101。
+
+## 可恢复状态（2026-11-03，Cycle 12 之后）
+
+- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 101/101 @30/60/120 Hz；本机 extras 98/101。
 - 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`）；或
-  `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz> [--only=t_anim]`；`UAL_EXTRAS=0` 强制 core。
-- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`（翻滚 A/B）、`BWD_RAW=1`（后退改回倒放前进片段，做 A/B）；
-  `tools/_bwd_probe.gd -- <walk|jog|sprint> [bwd]` 逐帧打印腿部运动学。
-- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round4`）；第 4 轮产物在 `/workspace/acceptance/round4/`。
-- 剩余问题：翻滚骨盆最高 0.7–0.9 m（可试：入口阶段按表限制骨盆高度）；core 侧移没有交叉步；后退只是适度改善（膝前伸 ~0.30 m）；
-  慢跑后退摆动中段腿后摆过快；攀爬起身时手臂甩到头侧；30 Hz 翻越速度跳变 9.6 m/s（门限 12）；推箱子 120 Hz 差约 30%；extras 模式 2 项失败。
+  `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz> [--only=t_anim]`；`UAL_EXTRAS=0` 强制 core；`FOOTIK_DEBUG=1` 打印锁脚跳脱。
+- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`、`ROLL_NOCAP=1`/`ROLL_CAP=<m>`、`BWD_RAW=1`、`AIM_WARP=1`（瞄准移动改回 warp，做 A/B）。
+  新增 class_name 脚本后先跑一次 `godot --headless --editor --quit --path .` 刷新类缓存。
+- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round5`）；第 5 轮产物在 `/workspace/acceptance/round5/`。
+- 剩余问题：翻滚入口后骨盆 0.57 m（目标 0.55；上限只作用于倒立帧，峰值可能在进入倒立前的过渡帧）；侧移最宽时步子偏大、上身仍是前进片段；瞄准前进/后退的片段滑步（0.8–1.0 m/s）仍靠 IK 锁脚抵消；
+  后退只是适度改善；30 Hz 翻越单帧跳变 0.32 m（9.6 m/s，门限内）；extras 模式 3 项失败。
 - 未验收（需 M2 真机）：所有动态观感。
 
 ## 下一步优先级
 
 0. （Round 2）脚部锁定 IK 以消除残留滑步（13–31% 身体速度）；找/做 CC0 的起步/停步/转身/侧移/翻越/攀上台沿专门片段替代程序化补偿；查明攀爬手部接触时长随物理频率变化的原因；真机 M2 验收。
-1. 推箱子 120 Hz 距离差异（~30%）。
+1. ~~推箱子 120 Hz 距离差异（~30%）~~（Round 5 已解决）。
 2. 空中接近矮墙时的“跳跃→翻越”衔接（跳跃缓冲进入检测距离时自动转翻越）。
 3. 真实 GPU 上的人工手感验收与参数微调（当前只在 llvmpipe 上渲染过）。
 4. ~~动画：灰盒程序化姿态 → 骨骼动画/IK~~（Round 2 已完成骨骼动画与手部 IK；脚部 IK 未做）。
