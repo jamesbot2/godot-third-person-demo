@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 102
+const EXPECTED_TOTAL := 103
 
 
 func want(name: String) -> bool:
@@ -1307,9 +1307,11 @@ func t_anim() -> void:
 			var lo_prev := ""
 			var sw_t: Array[float] = []
 			var up := {}
+			var pel_min := INF
 			for n in n_s:
 				var was_cd: Array = fk.cooldown.duplicate()
 				await tick()
+				pel_min = minf(pel_min, _bone_world("pelvis").y - pc.global_position.y)
 				var hv := pc.velocity * Vector3(1, 0, 1)
 				var mdir := hv.normalized()
 				var floor_y := pc.global_position.y
@@ -1391,6 +1393,7 @@ func t_anim() -> void:
 				res["warp"] = max_warp
 				res["cross"] = minf(-cross_lo, cross_hi)
 				res["wide"] = maxf(-cross_lo, cross_hi)
+				res["pel_min"] = pel_min
 				res["twist"] = tw_hi - tw_lo
 				res["hip_yaw"] = hy_hi - hy_lo
 				res["chest_yaw"] = cy_hi - cy_lo
@@ -1433,6 +1436,7 @@ func t_anim() -> void:
 		if is_strafe:
 			metric("anim_%s_cross_m" % spec[0], res["cross"])
 		metric("anim_%s_stance_max_m" % spec[0], res["wide"])
+		metric("anim_%s_pelvis_min_m" % spec[0], res.get("pel_min", -1.0))
 		metric("anim_%s_hip_chest_twist_deg" % spec[0], res["twist"])
 		metric("anim_%s_hip_yaw_range_deg" % spec[0], res["hip_yaw"])
 		metric("anim_%s_chest_yaw_range_deg" % spec[0], res["chest_yaw"])
@@ -1441,6 +1445,47 @@ func t_anim() -> void:
 		var clip_ok: bool = res["fk_med"] < 0.1 * res["v"] if authored else true
 		check("anim_%s" % spec[0], res["tp"] and res["ik_n"] > secs(0.3) and res["ik_med"] < 0.1 * res["v"] and absf(res["ik_drift"]) < 0.15 * res["v"] and res["pops"] == 0 and res["face"] < 10.0 and leg_ok and clip_ok,
 			"%s v=%.2f IK on: slip med=%.3f m/s (%.0f%% of v) p90=%.2f drift=%.2f pops=%d face_err=%.1fdeg leg_err=%.0fdeg warp=%.1fdeg cross=%.2fm widest=%.2fm n=%d | IK off: clip slip med=%.2f (%.0f%%%s) drift=%.2f" % ["aim-set" if aim_set else "warp", res["v"], res["ik_med"], 100.0 * res["ik_med"] / maxf(res["v"], 0.01), res["ik_p90"], res["ik_drift"], res["pops"], res["face"], res["leg"], res["warp"], res["cross"], res["wide"], res["ik_n"], res["fk_med"], 100.0 * res["fk_med"] / maxf(res["v"], 0.01), ", gated" if authored else "", res["fk_drift"]])
+	# aimed backpedal -> aimed forward switch (round 7): the round 6 showcase
+	# showed a crouched frame at the reversal (the blend position snapped
+	# to the opposite clip in one frame). Reference: the plain (un-aimed)
+	# forward gait's lowest pelvis at its steady speed.
+	await place(Vector3(4, 0.02, 20))
+	_anim.foot_ik_enabled = true
+	press("move_forward")
+	await tick(secs(1.2))
+	var ph_ref := INF
+	var v_ref := pc.get_horizontal_speed()
+	for n in secs(0.6):
+		await tick()
+		ph_ref = minf(ph_ref, _bone_world("pelvis").y - pc.global_position.y)
+	release_all()
+	await place(Vector3(4, 0.02, 20))
+	press("aim")
+	await tick(secs(0.3))
+	press("move_back")
+	await tick(secs(1.2))
+	var ph_prev := _bone_world("pelvis").y - pc.global_position.y
+	release("move_back"); press("move_forward")
+	var ph_min := INF
+	var t_min := 0.0
+	var ph_jump := 0.0
+	for n in secs(1.2):
+		await tick()
+		var ph := _bone_world("pelvis").y - pc.global_position.y
+		if OS.has_environment("SWITCH_DEBUG"):
+			print("SW n=%d ph=%.3f v=%.2f bp=%s" % [n, ph, pc.get_horizontal_speed(), str(_anim._aim_bp)])
+		ph_jump = maxf(ph_jump, absf(ph - ph_prev) * hz / 60.0)   # per 1/60 s
+		ph_prev = ph
+		if ph < ph_min:
+			ph_min = ph
+			t_min = float(n) / hz
+	var v_aim := pc.get_horizontal_speed()
+	release_all()
+	metric("anim_aim_switch_pelvis_min_m", ph_min)
+	metric("anim_aim_switch_pelvis_step_m", ph_jump)
+	metric("anim_fwd_ref_pelvis_min_m", ph_ref)
+	check("anim_aim_switch_no_crouch", ph_jump < 0.05 and ph_min > ph_ref - 0.05,
+		"backpedal->aim forward: max pelvis step %.3f m/frame(60Hz); pelvis min %.3f m at +%.2fs (v=%.1f) vs plain forward gait min %.3f m (v=%.1f)" % [ph_jump, ph_min, t_min, v_aim, ph_ref, v_ref])
 	# jump -> air -> land
 	await place(Vector3(0, 0.02, 4))
 	press("jump"); await tick(); release("jump")

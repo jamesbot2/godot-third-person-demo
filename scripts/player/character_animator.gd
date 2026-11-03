@@ -716,7 +716,16 @@ func _drive_ground(dt: float) -> void:
 	if has_aim_set:
 		var ld := p_local_dir
 		var bp := ld.normalized() if (ld.length() > 1e-3 and v > 0.3) else _aim_bp
-		_aim_bp = _aim_bp.slerp(bp, 1.0 - exp(-14.0 * dt)) if _aim_bp.dot(bp) > -0.99 else bp
+		# a straight reversal (backpedal <-> forward) used to SNAP the blend
+		# position to the opposite clip: one-frame pose jump (pelvis -12 cm,
+		# the "crouched frame"). Nudge it off the axis instead so the slerp
+		# turns it through the side clips (round 7)
+		# (angular speed capped at 10 rad/s: a 180 deg turnaround takes
+		# ~0.3 s instead of 2-3 frames, so no pose jumps a lot in one frame)
+		var ab := _aim_bp if _aim_bp.dot(bp) > -0.99 else _aim_bp.rotated(0.05)
+		var ang := absf(ab.angle_to(bp))
+		var stp := minf(ang * (1.0 - exp(-14.0 * dt)), 10.0 * dt)
+		_aim_bp = ab.slerp(bp, stp / ang) if ang > 1e-4 else bp
 		_aim_phase = fposmod(_aim_phase + dt * v / _aim_stride(_aim_bp), 1.0)
 		_p("ground/aim2d/blend_position", _aim_bp)
 		_p("ground/aim_seek/seek_request", _aim_phase * StrafeGait.LEN)

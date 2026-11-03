@@ -58,8 +58,11 @@ const HIP_YAW := 7.0
 const REACH := 0.965
 ## round 6 re-posed aim_fwd / aim_bwd (see build): stance fraction, swing
 ## lift (m), stance width scale, stance centre offset along the movement (m;
-## 0 measured best for the backpedal swing knee)
-const FB_DUTY := 0.42
+## 0 measured best for the backpedal swing knee). Round 7: FB_DUTY 0.42 ->
+## 0.32 (jog-like stance fraction): the long 0.42 stance swept the feet
+## +-0.59 m and the reach-keeping pelvis drop sank aimed forward to 0.67 m
+## (plain forward gait 0.80 m) -- the "crouched" look; now ~0.77 m
+const FB_DUTY := 0.32
 const FB_DUTY_B := 0.38
 const FB_LIFT_F := 0.16
 const FB_LIFT_B := 0.08
