@@ -92,6 +92,13 @@ const LEN_CWALK := 2.0
 	Vector2(1.8, 1.95), Vector2(3.0, 2.4), Vector2(4.2, 2.6), Vector2(6.8, 2.95), Vector2(9.0, 3.2)])
 @export var warp_limit_deg := 70.0
 @export var warp_limit_aim_deg := 92.0
+## Aimed locomotion: BlendSpace2D over the authored aim set (StrafeGait:
+## aim_fwd / aim_bwd / cross-step strafe_l / strafe_r). AIM_WARP=1 restores
+## the old orientation-warp strafe for A/B measurement.
+## Lateral distance per strafe cycle (m): cycle rate = v / this.
+@export var strafe_stride := 1.6
+## Distance per cycle of the authored diagonal clips (m).
+@export var diag_stride := 2.0
 @export var backward_enter_deg := 115.0
 @export var backward_exit_deg := 95.0
 
@@ -166,6 +173,12 @@ var _vel_s := Vector3.ZERO
 var _acc_s := Vector3.ZERO
 var _backward := false
 var _bwd_s := 0.0   # smoothed weight of the authored backward gait
+var _aim_s := 0.0   # smoothed weight of the aim BlendSpace2D branch
+var _aim_phase := 0.0   # shared normalized phase of the aim clips
+var _aim_bp := Vector2(0, 1)   # smoothed blend position
+var _aim_stride_f := 2.0   # stride/cycle of aim_fwd, aim_bwd (m)
+var _aim_stride_b := 2.0
+var has_aim_set := false
 var _land_t := 99.0
 var _land_peak := 0.0
 var _land_rate := 1.0
@@ -239,6 +252,7 @@ func _ready() -> void:
 	clip_library()
 	has_extras = _lib_has_extras
 	_sample_traverse_clips()
+	_build_aim_set()
 	_arm_len = skeleton.get_bone_rest(skeleton.find_bone("lowerarm_l")).origin.length() \
 		+ skeleton.get_bone_rest(skeleton.find_bone("hand_l")).origin.length()
 	# Modifier results (lean/warp/IK) only exist while the skeleton is being
@@ -343,6 +357,25 @@ func _setup_arm_ik() -> void:
 			arm_ik_r = ik
 
 
+func _build_aim_set() -> void:
+	if OS.get_environment("AIM_WARP") == "1" or _pc == null:
+		return
+	var m := Transform3D.IDENTITY
+	var n: Node = skeleton
+	while n != self:
+		m = (n as Node3D).transform * m
+		n = n.get_parent()
+	var unit := m.basis.get_scale().y
+	var vf := _pc.aim_speed
+	var vb := _pc.aim_speed * _pc.backpedal_factor
+	var gf := _solve_gait(vf * 2.0 / _cadence(vf), 0.0)
+	var gb := _solve_gait(vb * 2.0 / _cadence(vb), 0.0)
+	_aim_stride_f = _stride_at(gf, 0.0)
+	_aim_stride_b = _stride_at(gb, 0.0)
+	StrafeGait.build(skeleton, clip_library(), gf, gb, strafe_stride, diag_stride, unit)
+	has_aim_set = true
+
+
 func _sample_traverse_clips() -> void:
 	# skeleton space -> this node's axes, origin at the visual root (character)
 	var m := Transform3D.IDENTITY
@@ -396,6 +429,27 @@ func _blend2(bt: AnimationNodeBlendTree, name: String, a: String, b: String, pos
 	return name
 
 
+## stride per cycle of the aim blend space at blend position `bp` (unit
+## vector): the blend between the two neighbouring points (45 deg apart)
+func _aim_stride(bp: Vector2) -> float:
+	var st := [_aim_stride_f, diag_stride, strafe_stride, diag_stride, _aim_stride_b, diag_stride, strafe_stride, diag_stride]
+	var a := fposmod(atan2(bp.x, bp.y), TAU) / (PI / 4.0)
+	var i := int(a) % 8
+	return maxf(lerpf(st[i], st[(i + 1) % 8], a - floorf(a)), 0.3)
+
+
+func _aim_branch(g: AnimationNodeBlendTree, dirn: String) -> String:
+	var a2 := AnimationNodeBlendSpace2D.new()
+	for pt in StrafeGait.POINTS:
+		a2.add_blend_point(_anim(pt[0]), pt[1])
+	g.add_node("aim2d", a2, Vector2(600, -600))
+	g.add_node("aim_seek", AnimationNodeTimeSeek.new(), Vector2(800, -600))
+	g.add_node("aim_ts", AnimationNodeTimeScale.new(), Vector2(1000, -600))
+	g.connect_node("aim_seek", 0, "aim2d")
+	g.connect_node("aim_ts", 0, "aim_seek")
+	return _blend2(g, "aimsel", dirn, "aim_ts", Vector2(900, -100))
+
+
 func _build_tree() -> AnimationNodeStateMachine:
 	var sm := AnimationNodeStateMachine.new()
 	# ground: phase-synced locomotion + crouch + landing cushion overlay
@@ -415,7 +469,12 @@ func _build_tree() -> AnimationNodeStateMachine:
 	var runb := _blend2(g, "run_b", jb, sb, Vector2(500, -250), true)
 	var gaitb := _blend2(g, "gait_b", wb, runb, Vector2(700, -300), true)
 	var dirn := _blend2(g, "dir", gaitn, gaitb, Vector2(800, 0), true)
-	var move := _blend2(g, "move", "idle", dirn, Vector2(900, 100))
+	# aimed: BlendSpace2D over the phase-aligned aim set, one shared phase
+	# (TimeSeek above the space seeks all four clips together)
+	var aimsel := dirn
+	if has_aim_set:
+		aimsel = _aim_branch(g, dirn)
+	var move := _blend2(g, "move", "idle", aimsel, Vector2(900, 100))
 	g.add_node("cidle", _anim("crouch_idle"), Vector2(0, 600))
 	var cw := _scaled(g, "cwalk", "crouch_walk", Vector2(0, 750))
 	var cmove := _blend2(g, "cmove", "cidle", cw, Vector2(500, 650))
@@ -641,7 +700,19 @@ func _drive_ground(dt: float) -> void:
 	# clips, so the legs may yaw the full 90 deg (spine counter-twists)
 	var lim := deg_to_rad(warp_limit_aim_deg if _pc.is_aiming else warp_limit_deg)
 	target_warp = clampf(target_warp, -lim, lim) * clampf((v - 0.3) / 0.5, 0.0, 1.0)
+	var aim_t := 1.0 if (has_aim_set and _pc.is_aiming and not _pc.is_crouched) else 0.0
+	_aim_s = lerpf(_aim_s, aim_t, 1.0 - exp(-12.0 * dt))
+	target_warp *= 1.0 - aim_t   # aim set: legs face the camera, the clips step sideways
 	warp_angle = lerp_angle(warp_angle, target_warp, 1.0 - exp(-12.0 * dt))
+	if has_aim_set:
+		var ld := p_local_dir
+		var bp := ld.normalized() if (ld.length() > 1e-3 and v > 0.3) else _aim_bp
+		_aim_bp = _aim_bp.slerp(bp, 1.0 - exp(-14.0 * dt)) if _aim_bp.dot(bp) > -0.99 else bp
+		_aim_phase = fposmod(_aim_phase + dt * v / _aim_stride(_aim_bp), 1.0)
+		_p("ground/aim2d/blend_position", _aim_bp)
+		_p("ground/aim_seek/seek_request", _aim_phase * StrafeGait.LEN)
+		_p("ground/aim_ts/scale", 0.0)
+		_p("ground/aimsel/blend_amount", _aim_s)
 
 	# gait solve: stride needed for a human cadence at this speed
 	var stride_need := v * 2.0 / _cadence(v)

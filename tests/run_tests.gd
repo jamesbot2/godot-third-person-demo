@@ -1239,15 +1239,19 @@ func t_anim() -> void:
 		check("anim_feet_%s" % spec[0], gaps.size() > secs(1.0) and pen < 0.02 and fmed < 0.02 and fp90 < 0.07,
 			"lowest-foot sole gap over ground: median=%.3f m p90=%.3f m  max penetration=%.3f m  n=%d max_y=%.2f" % [fmed, fp90, pen, gaps.size(), maxf(g["max_y"], g2["max_y"])])
 	# aimed strafe / backpedal / diagonal: the body faces the camera and the
-	# legs carry it in the movement direction. Core library has no directional
-	# clips: legs = forward cycle with the pelvis yawed toward the movement
-	# (orientation warp, spine counter-twists) or reverse playback for
-	# backpedal. Two passes:
-	#  1. foot IK off -> "clip slip" metric only (how well the warped clip
-	#     matches the ground motion before IK; reported, not gated)
+	# legs carry it in the movement direction. Shipping: BlendSpace2D over the
+	# authored aim set (StrafeGait: CC0 fwd/bwd + cross-step side/diagonal
+	# clips), legs face the camera (warp 0). AIM_WARP=1: the old
+	# orientation-warp strafe (forward cycle yawed toward the movement).
+	# Two passes:
+	#  1. foot IK off -> "clip slip" (how well the clip itself matches the
+	#     ground motion); gated < 10 % of speed for the authored side /
+	#     diagonal clips (the CC0 fwd/bwd clips are reported only)
 	#  2. foot IK on (shipping config): planted-ball slip < 10 % of speed, no
-	#     drift, no lock breaks (visible pops), face error < 10 deg, legs
-	#     pointing within 25 deg of the movement (or its reverse)
+	#     drift, no lock breaks (visible pops), face error < 10 deg; aim set:
+	#     warp < 5 deg and (strafe) the feet really cross (order along the
+	#     movement swaps both ways by > 8 cm); AIM_WARP=1: legs pointing
+	#     within 25 deg of the movement (or its reverse)
 	for spec in [["aim_fwd", ["move_forward"]], ["strafe_left", ["move_left"]], ["strafe_right", ["move_right"]],
 			["backpedal", ["move_back"]], ["diag_fl", ["move_forward", "move_left"]], ["diag_br", ["move_back", "move_right"]]]:
 		var res := {}
@@ -1269,6 +1273,9 @@ func t_anim() -> void:
 			var tp_ok := true
 			var vs := 0.0
 			var knee_lead := 0.0   # swing knee ahead of the hips along the legs' heading
+			var max_warp := 0.0
+			var cross_lo := INF   # (ball_l - ball_r) along the movement
+			var cross_hi := -INF
 			var n_s := secs(1.2)
 			for n in n_s:
 				var was_cd: Array = fk.cooldown.duplicate()
@@ -1301,6 +1308,10 @@ func t_anim() -> void:
 					var e := absf(wrapf(mv_yaw - leg_yaw, -PI, PI))
 					e = minf(e, PI - e)
 					max_leg = maxf(max_leg, rad_to_deg(e))
+					max_warp = maxf(max_warp, absf(rad_to_deg(_anim.warp_angle)))
+					var dl := (_bone_world("ball_l") - _bone_world("ball_r")).dot(mdir)
+					cross_lo = minf(cross_lo, dl)
+					cross_hi = maxf(cross_hi, dl)
 					var lf := Vector3(-sin(leg_yaw), 0, -cos(leg_yaw))
 					var pel := _bone_world("pelvis")
 					for sd in ["l", "r"]:
@@ -1324,6 +1335,8 @@ func t_anim() -> void:
 				res["leg"] = max_leg
 				res["tp"] = tp_ok
 				res["knee_lead"] = knee_lead
+				res["warp"] = max_warp
+				res["cross"] = minf(-cross_lo, cross_hi)
 		_anim.foot_ik_enabled = true
 		metric("anim_%s_clip_slip_med" % spec[0], res["fk_med"])
 		metric("anim_%s_slip_med" % spec[0], res["ik_med"])
@@ -1336,8 +1349,16 @@ func t_anim() -> void:
 			# the authored clip 0.29-0.31 m. Modest gate: it catches a
 			# regression to the raw clip, not a full redesign.
 			check("anim_backpedal_gait", res["knee_lead"] < 0.33, "max swing knee lead ahead of hips=%.2f m (raw reversed forward clip 0.36)" % res["knee_lead"])
-		check("anim_%s" % spec[0], res["tp"] and res["ik_n"] > secs(0.3) and res["ik_med"] < 0.1 * res["v"] and absf(res["ik_drift"]) < 0.15 * res["v"] and res["pops"] == 0 and res["face"] < 10.0 and res["leg"] < 25.0,
-			"v=%.2f IK on: slip med=%.3f m/s (%.0f%% of v) p90=%.2f drift=%.2f pops=%d face_err=%.1fdeg leg_err=%.0fdeg n=%d | IK off: clip slip med=%.2f (%.0f%%) drift=%.2f" % [res["v"], res["ik_med"], 100.0 * res["ik_med"] / maxf(res["v"], 0.01), res["ik_p90"], res["ik_drift"], res["pops"], res["face"], res["leg"], res["ik_n"], res["fk_med"], 100.0 * res["fk_med"] / maxf(res["v"], 0.01), res["fk_drift"]])
+		var aim_set: bool = _anim.has_aim_set
+		var authored: bool = aim_set and spec[0] in ["strafe_left", "strafe_right", "diag_fl", "diag_br"]
+		var is_strafe: bool = spec[0] in ["strafe_left", "strafe_right"]
+		metric("anim_%s_warp_deg" % spec[0], res["warp"])
+		if is_strafe:
+			metric("anim_%s_cross_m" % spec[0], res["cross"])
+		var leg_ok: bool = (res["warp"] < 5.0 and (res["cross"] > 0.08 or not is_strafe)) if aim_set else res["leg"] < 25.0
+		var clip_ok: bool = res["fk_med"] < 0.1 * res["v"] if authored else true
+		check("anim_%s" % spec[0], res["tp"] and res["ik_n"] > secs(0.3) and res["ik_med"] < 0.1 * res["v"] and absf(res["ik_drift"]) < 0.15 * res["v"] and res["pops"] == 0 and res["face"] < 10.0 and leg_ok and clip_ok,
+			"%s v=%.2f IK on: slip med=%.3f m/s (%.0f%% of v) p90=%.2f drift=%.2f pops=%d face_err=%.1fdeg leg_err=%.0fdeg warp=%.1fdeg cross=%.2fm n=%d | IK off: clip slip med=%.2f (%.0f%%%s) drift=%.2f" % ["aim-set" if aim_set else "warp", res["v"], res["ik_med"], 100.0 * res["ik_med"] / maxf(res["v"], 0.01), res["ik_p90"], res["ik_drift"], res["pops"], res["face"], res["leg"], res["warp"], res["cross"], res["ik_n"], res["fk_med"], 100.0 * res["fk_med"] / maxf(res["v"], 0.01), ", gated" if authored else "", res["fk_drift"]])
 	# jump -> air -> land
 	await place(Vector3(0, 0.02, 4))
 	press("jump"); await tick(); release("jump")
