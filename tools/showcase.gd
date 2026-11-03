@@ -23,7 +23,7 @@ var main: Node
 var pc: PlayerController
 var rig: CameraRig
 var anim: Node
-var shots_dir := "/workspace/acceptance/round7"
+var shots_dir := "/workspace/acceptance/round8"
 var only: PackedStringArray = []
 var move_world := Vector3.ZERO   # desired world-space move direction (re-mapped every frame)
 var orbit_rate := 0.0            # camera yaw rad/s
@@ -511,6 +511,32 @@ func _run() -> void:
 		var line := "CRATE|moved=%.2fm player=%s crate=%s" % [crate.global_position.distance_to(c0), pc.global_position, crate.global_position]
 		print(line)
 		log_lines.append(line)
+		cam(Vector3.ZERO)
+		release_all(); await frames(0.3)
+
+	# Round 8: tall pushes -- the stack (Crate1 with Crate4 on top, 1.6 m)
+	# and the heavy 1.2 m crate (does not move): hands on the face
+	if seg("crate_tall"):
+		var stack: Node3D = main.get_node("Props/Crate1")
+		var s0 := stack.global_position
+		await place(s0 + Vector3(0, 0.02 - s0.y, 2.0), 0.0, 0.0)
+		cam(Vector3(2.6, 1.8, 1.4), 0.9, 48.0)
+		move_world = fwd
+		await frames(1.2); await shot("crate_stack_push")
+		await closeup("crate_stack_side", Vector3(2.0, 0.9, 0.0), 0.9, 44.0)
+		await closeup("crate_stack_back", Vector3(1.2, 1.0, 1.6), 1.0, 44.0)
+		var top: Node3D = main.get_node("Props/Crate4")
+		var line2 := "CRATE_STACK|moved=%.2fm top_moved=%.2fm" % [stack.global_position.distance_to(s0), top.global_position.distance_to(s0 + Vector3(0, 0.8, 0))]
+		print(line2)
+		log_lines.append(line2)
+		release_all(); await frames(0.3)
+		var heavy: Node3D = main.get_node("Props/Crate5")
+		var h0 := heavy.global_position
+		await place(h0 + Vector3(0, 0.02 - h0.y, 2.0), 0.0, 0.0)
+		cam(Vector3(2.6, 1.8, 1.4), 0.9, 48.0)
+		move_world = fwd
+		await frames(1.2); await shot("crate_heavy_push")
+		await closeup("crate_heavy_side", Vector3(2.2, 0.9, 0.0), 0.9, 44.0)
 		cam(Vector3.ZERO)
 		release_all(); await frames(0.3)
 

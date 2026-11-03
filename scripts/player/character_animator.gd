@@ -226,9 +226,26 @@ var _push_hold := 0.0
 var _push_body: RigidBody3D = null
 var _push_pt_local := Vector3.ZERO   # contact point in the crate's frame
 var _push_n := Vector3.FORWARD       # contact normal (toward the player), world
-## forward lean (spine pitch) and knee bend while pushing
-const PUSH_LEAN := deg_to_rad(26.0)
-const PUSH_DROP := 0.12
+var _push_tall := false               # hands on the face (tall crate / stack)
+var _push_top_body: Node3D = null     # highest body stacked on the pushed one
+var _push_off := 0.0                  # visual root shift away from the crate (m)
+## Round 8 push pose (low crate): spine lean, crouch-walk legs blended in
+## (bent trailing knee, short steps), the mesh shifted back off the crate
+## face so the front knee clears it and the arms reach forward.
+## Tall crate / stack: upright-ish, hands on the face at chest height.
+## (env PUSH_LEAN / PUSH_CROUCH / PUSH_BACK / PUSH_DROP override, A/B only)
+## drawn front face of the pushed crate (tests: hands vs the face this
+## frame was posed against)
+var push_face := Plane()
+var PUSH_LEAN := deg_to_rad(_envf("PUSH_LEAN", 28.0))
+var PUSH_DROP := _envf("PUSH_DROP", 0.0)
+var PUSH_CROUCH := _envf("PUSH_CROUCH", 0.35)
+var PUSH_BACK := _envf("PUSH_BACK", 0.15)
+var PUSH_LEAN_TALL := deg_to_rad(_envf("PUSH_LEAN_TALL", 10.0))
+var PUSH_BACK_TALL := _envf("PUSH_BACK_TALL", 0.16)
+var PUSH_CROUCH_TALL := _envf("PUSH_CROUCH_TALL", 0.25)
+## hand height on a tall face, above the feet (chest)
+const PUSH_FACE_H := 1.22
 var _plant_set := [false, false]
 var _tr_clip_t := 0.0               # clip time of the active traverse clip
 var _vault_tail := false            # vault clip finishing after the controller left TRAVERSE
@@ -753,6 +770,8 @@ func _drive_ground(dt: float) -> void:
 	# worse; start/stop slip is handled by FootIK's swing release + settle)
 	cycle_rate = v / s_blend * (-1.0 if _backward else 1.0)
 	var crouch_t := 1.0 if (_pc.is_crouched and p_state == "GROUND") else 0.0
+	# push: crouch-walk legs blended in (bent knees, shorter steps)
+	crouch_t = maxf(crouch_t, (PUSH_CROUCH_TALL if _push_tall else PUSH_CROUCH) * smoothstep(0.0, 1.0, push_w))
 	_crouch_s = lerpf(_crouch_s, crouch_t, 1.0 - exp(-10.0 * dt))
 	_p("ground/walk_ts/scale", LEN_WALK * cycle_rate)
 	_p("ground/jog_ts/scale", LEN_JOG * cycle_rate)
@@ -1250,10 +1269,41 @@ func _drive_traverse_core(dt: float, st: String) -> void:
 ## _drive_procedural). The contact is held for 0.25 s after the controller's
 ## per-tick contact drops (it flickers while the crate slides) and the pose
 ## blends in/out over ~0.25 s. Pure presentation.
+static func _envf(k: String, d: float) -> float:
+	return float(OS.get_environment(k)) if OS.has_environment(k) else d
+
+
+func _box_half(b: Node3D) -> Vector3:
+	for c in b.get_children():
+		if c is CollisionShape3D and (c as CollisionShape3D).shape is BoxShape3D:
+			return ((c as CollisionShape3D).shape as BoxShape3D).size * 0.5
+	return Vector3(0.4, 0.4, 0.4)
+
+
+## Highest prop resting on top of `b` (a stack), found by a downward ray just
+## inside the pushed face; `b` itself when nothing is stacked on it.
+func _stack_top_body(b: RigidBody3D, n: Vector3) -> Node3D:
+	var bx := b.global_transform
+	var half := _box_half(b)
+	var p := bx.origin + n * (half.z - 0.12)
+	p.y = bx.origin.y + half.y + 2.5
+	var q := PhysicsRayQueryParameters3D.create(p, Vector3(p.x, bx.origin.y, p.z), 2)
+	q.exclude = [_pc.get_rid()]
+	var hit := _pc.get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty() or not (hit.collider is RigidBody3D):
+		return b
+	return hit.collider
+
+
 func _drive_push_hands(dt: float, st: String) -> void:
 	if st == "GROUND" and _pc.is_pushing and _pc.push_body != null:
 		if _pc.push_body != _push_body:
 			_push_body = _pc.push_body
+			# fixed per push (not per frame): top/face must not flip mid-push
+			_push_top_body = _stack_top_body(_push_body, _pc.push_normal)
+			var tb := _push_top_body.get_global_transform_interpolated()
+			var top0 := tb.origin.y + _box_half(_push_top_body).y
+			_push_tall = top0 - _pc.get_global_transform_interpolated().origin.y > 1.05
 		_push_pt_local = _push_body.global_transform.affine_inverse() * _pc.push_point
 		_push_n = _pc.push_normal
 		_push_hold = 0.25
@@ -1263,21 +1313,35 @@ func _drive_push_hands(dt: float, st: String) -> void:
 	push_w = move_toward(push_w, 1.0 if on else 0.0, dt * 4.0)
 	if push_w <= 0.0 or not is_instance_valid(_push_body):
 		push_w = 0.0
+		if _push_off != 0.0 and _pc.state != PlayerController.State.TRAVERSE:
+			character.position.x = 0.0
+			character.position.z = 0.0
+		_push_off = 0.0
 		return
 	# the DRAWN crate (physics interpolation): its physics transform leads
 	# the drawn one by up to one tick (6.7 cm at 2 m/s, 30 Hz)
 	var bx := _push_body.get_global_transform_interpolated()
-	var half := Vector3(0.4, 0.4, 0.4)
-	for c in _push_body.get_children():
-		if c is CollisionShape3D and (c as CollisionShape3D).shape is BoxShape3D:
-			half = ((c as CollisionShape3D).shape as BoxShape3D).size * 0.5
+	var half := _box_half(_push_body)
 	var top := (bx * Vector3(0, half.y, 0)).y
-	var pt := bx * _push_pt_local
+	if is_instance_valid(_push_top_body) and _push_top_body != _push_body:
+		top = maxf(top, _push_top_body.get_global_transform_interpolated().origin.y + _box_half(_push_top_body).y)
 	var n := _push_n
-	var face_d := pt.dot(n)            # front face plane: x.n = face_d
+	# front face plane x.n = face_d, from the drawn box itself (the contact
+	# point is a physics-tick sample and left the hands up to 12 cm off the
+	# face of a moving stack at 30 Hz)
+	var face_d := bx.origin.dot(n)
+	for ax in 3:
+		face_d += absf(bx.basis[ax].normalized().dot(n)) * half[ax]
+	push_face = Plane(n, face_d)
 	var lat := n.cross(Vector3.UP).normalized()
 	var iks := [arm_ik, arm_ik_r]
 	var w := smoothstep(0.0, 1.0, push_w)
+	# stand back off the face (mesh only; the capsule touches the crate)
+	_push_off = (PUSH_BACK_TALL if _push_tall else PUSH_BACK) * w
+	if _pc.state != PlayerController.State.TRAVERSE:
+		var lo := global_basis.inverse() * (n * _push_off)
+		character.position.x = lo.x
+		character.position.z = lo.z
 	for i in 2:
 		var sd := "l" if i == 0 else "r"
 		var sh := get_final_bone_world("upperarm_" + sd)
@@ -1289,9 +1353,9 @@ func _drive_push_hands(dt: float, st: String) -> void:
 		# (fixed choice per crate height, not the swinging shoulder: switching
 		# between top and face mid-push jumped the hands 10 cm)
 		var feet_y := _pc.get_global_transform_interpolated().origin.y
-		if top - feet_y > 1.05:
-			# tall crate / stack: palms on the face, a little below the shoulder
-			var y := minf(top - 0.10, feet_y + 1.05)
+		if _push_tall:
+			# tall crate / stack: palms on the face at chest height
+			var y := minf(top - 0.12, feet_y + PUSH_FACE_H)
 			tgt = lat * h_lat + Vector3.UP * y
 			tgt += n * (face_d + 0.04 - tgt.dot(n))
 		else:
@@ -1303,7 +1367,8 @@ func _drive_push_hands(dt: float, st: String) -> void:
 		var right := -n.cross(Vector3.UP).normalized()
 		hand_w[i] = maxf(hand_w[i], w)
 		_ik_tf_world[i] = fk.lerp(tgt, w)
-		_ik_p[i].global_position = tgt + n * 0.5 + right * side * 0.5 - Vector3.UP * 0.3
+		# elbows back, out and down (not tucked against the ribs)
+		_ik_p[i].global_position = tgt + n * 0.45 + right * side * 0.55 - Vector3.UP * 0.45
 		_ik_t[i].global_basis = Basis.looking_at(n, Vector3.UP)
 		iks[i].influence = clampf(hand_w[i], 0.0, 1.0)
 		iks[i].active = hand_w[i] > 0.001
@@ -1798,7 +1863,7 @@ func _drive_procedural(dt: float, st: String) -> void:
 	if st == "VAULT" or st == "MANTLE" or absf(_tr_lean) > 0.001:
 		_pitch_s = maxf(_pitch_s, _tr_lean)
 	if push_w > 0.0:
-		_pitch_s = maxf(_pitch_s, PUSH_LEAN * smoothstep(0.0, 1.0, push_w))
+		_pitch_s = maxf(_pitch_s, (PUSH_LEAN_TALL if _push_tall else PUSH_LEAN) * smoothstep(0.0, 1.0, push_w))
 	_bank_s = lerpf(_bank_s, bank_t, 1.0 - exp(-8.0 * dt))
 	# Slope / stair: drop the pelvis a little so the lower foot reaches.
 	# (superseded by FootIK's ground-raycast pelvis correction when it is on)

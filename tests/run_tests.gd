@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 107
+const EXPECTED_TOTAL := 110
 
 
 func want(name: String) -> bool:
@@ -834,6 +834,9 @@ func t_crates() -> void:
 	var gap_lo := INF     # wrist height above the drawn crate top
 	var gap_hi := -INF
 	var lean_sum := 0.0
+	var knee_clear := INF
+	var trail_flex_sum := 0.0
+	var elbow_sum := 0.0
 	for n in secs(2.0):
 		var pp := pc.global_position
 		await tick()
@@ -850,6 +853,13 @@ func t_crates() -> void:
 					hand_err = maxf(hand_err, hw.distance_to(am.push_hand_t[i]))
 					gap_lo = minf(gap_lo, hw.y - ctop)
 					gap_hi = maxf(gap_hi, hw.y - ctop)
+				# Round 8: pose -- knees clear of the pushed face, trailing
+				# knee bent (not a locked lunge), elbows not tucked.
+				var cc := light.get_global_transform_interpolated().origin
+				var pf := _push_pose(am, cc, -fwd_h, 0.4)
+				knee_clear = minf(knee_clear, pf.x)
+				trail_flex_sum += pf.y
+				elbow_sum += pf.z
 			lean_sum += lean
 			if OS.has_environment("PUSH_DEBUG"):
 				print("PUSHDBG lean=%.1f w=%.2f sh-t=%.3f,%.3f err=%.3f,%.3f" % [lean, am.push_w, am.get_final_bone_world("upperarm_l").distance_to(am.push_hand_t[0]), am.get_final_bone_world("upperarm_r").distance_to(am.push_hand_t[1]), am.get_final_bone_world("hand_l").distance_to(am.push_hand_t[0]), am.get_final_bone_world("hand_r").distance_to(am.push_hand_t[1])])
@@ -881,16 +891,102 @@ func t_crates() -> void:
 	metric("crate_push_wrist_over_top_min_m", gap_lo)
 	metric("crate_push_wrist_over_top_max_m", gap_hi)
 	check("crate_push_hands_on_crate", hand_n > push_n / 2 and hand_err < 0.04 and gap_lo > 0.0 and gap_hi < 0.08, "hands-on ticks=%d/%d max wrist-target err=%.3fm wrist over crate top %.3f..%.3fm" % [hand_n, push_n, hand_err, gap_lo, gap_hi])
+	var hn := maxf(hand_n, 1)
+	metric("crate_push_knee_clear_min_m", knee_clear)
+	metric("crate_push_trail_knee_flex_deg", trail_flex_sum / hn)
+	metric("crate_push_elbow_deg", elbow_sum / hn)
+	check("crate_push_pose", knee_clear > 0.03 and trail_flex_sum / hn > PUSH_TRAIL_FLEX_MIN and elbow_sum / hn > 115.0 and elbow_sum / hn < 170.0, "min knee/toe clearance from crate face=%.3fm (want >0.03) trailing knee flex=%.1f deg (want >%.0f) elbow=%.1f deg (want 115..170)" % [knee_clear, trail_flex_sum / hn, PUSH_TRAIL_FLEX_MIN, elbow_sum / hn])
 	check("crate_push_leans", lean_sum / pn > lean_idle + 12.0, "torso lean pushing=%.1f deg, standing=%.1f deg" % [lean_sum / pn, lean_idle])
 	check("crate_push_anim_walks", push_n > 5 and absf(push_anim / pn - push_disp / pn) < 0.35 and push_anim / pn > 1.2, "pushing ticks=%d anim speed=%.2f body speed=%.2f (clipped velocity %.2f)" % [push_n, push_anim / pn, push_disp / pn, push_vel / pn])
 	var hp0 := heavy.global_position
 	await place(hp0 + Vector3(0, 0.02 - hp0.y, 2.0))
 	press("move_forward")
-	for n in secs(2.0):
-		await tick()
+	var hface := await _tall_push_hands(am, heavy, 0.6, secs(2.0))
 	release_all()
 	var hmoved := heavy.global_position.distance_to(hp0)
 	check("crate_heavy_resists", hmoved < moved * 0.6 and pc.global_position.y < 0.1, "heavy moved=%.2fm" % hmoved)
+	# Round 8: crates taller than ~1.05 m (the 1.2 m heavy one, or a 1.6 m
+	# stack) are pushed with the hands flat on the face at chest height,
+	# not reaching up for the top.
+	var stk: RigidBody3D = main.get_node("Props/Crate1")
+	var stop: RigidBody3D = main.get_node("Props/Crate4")
+	var sp0 := stk.global_position
+	await place(sp0 + Vector3(0, 0.02 - sp0.y, 2.0))
+	press("move_forward")
+	var sface := await _tall_push_hands(am, stk, 0.4, secs(2.0))
+	release_all()
+	var smoved := stk.global_position.distance_to(sp0)
+	var stop_rel := stop.global_position - stk.global_position
+	for r in [["heavy", hface], ["stack", sface]]:
+		var f: Array = r[1]
+		metric("crate_tall_%s_hands_ticks" % r[0], f[0])
+		metric("crate_tall_%s_wrist_h_min_m" % r[0], f[1])
+		metric("crate_tall_%s_wrist_h_max_m" % r[0], f[2])
+		metric("crate_tall_%s_wrist_face_max_m" % r[0], f[3])
+		metric("crate_tall_%s_wrist_err_m" % r[0], f[4])
+	metric("crate_tall_heavy_face_plane_err_m", hface[5])
+	metric("crate_stack_moved_m", smoved)
+	metric("crate_stack_top_offset_m", Vector2(stop_rel.x, stop_rel.z).length())
+	var tall_ok := true
+	for f in [hface, sface]:
+		tall_ok = tall_ok and f[5] < 0.01 and f[0] > secs(0.5) and f[1] > 1.0 and f[2] < 1.4 and f[3] < 0.08 and f[3] > -0.02 and f[4] < 0.04
+	check("crate_tall_hands_on_face", tall_ok, "heavy: ticks=%d wrist h=%.2f..%.2fm face gap max=%.3fm err=%.3fm | stack: ticks=%d wrist h=%.2f..%.2fm face gap max=%.3fm err=%.3fm (want h 1.0..1.4, gap -0.02..0.08, err<0.04)" % (hface.slice(0, 5) + sface.slice(0, 5)))
+	check("crate_stack_pushes", smoved > 0.5 and Vector2(stop_rel.x, stop_rel.z).length() < 0.25 and stop_rel.y > 0.6, "stack moved=%.2fm top crate offset=%.2fm h=%.2fm" % [smoved, Vector2(stop_rel.x, stop_rel.z).length(), stop_rel.y])
+
+
+const PUSH_TRAIL_FLEX_MIN := 18.0
+
+
+# x: min clearance (knees and toes) in front of the pushed face, y: knee
+# flex of the trailing leg (deg), z: mean elbow interior angle (deg).
+func _push_pose(am: Node, cc: Vector3, n: Vector3, half: float) -> Vector3:
+	var clear := INF
+	var flex := [0.0, 0.0]
+	var back := [0.0, 0.0]
+	for i in 2:
+		var s := "_l" if i == 0 else "_r"
+		var th: Vector3 = am.get_final_bone_world("thigh" + s)
+		var kn: Vector3 = am.get_final_bone_world("calf" + s)
+		var ft: Vector3 = am.get_final_bone_world("foot" + s)
+		var bl: Vector3 = am.get_final_bone_world("ball" + s)
+		clear = minf(clear, minf((kn - cc).dot(n), (bl - cc).dot(n)) - half)
+		flex[i] = rad_to_deg((kn - th).angle_to(ft - kn))
+		back[i] = (ft - cc).dot(n)
+	var el := 0.0
+	for s in ["_l", "_r"]:
+		var ua: Vector3 = am.get_final_bone_world("upperarm" + s)
+		var la: Vector3 = am.get_final_bone_world("lowerarm" + s)
+		var hd: Vector3 = am.get_final_bone_world("hand" + s)
+		el += 0.5 * rad_to_deg((ua - la).angle_to(hd - la))
+	return Vector3(clear, flex[0] if back[0] > back[1] else flex[1], el)
+
+
+# Push a tall crate for `ticks`; returns [hands-on ticks, wrist height above
+# the feet min, max, max wrist gap in front of the face, max wrist-target err,
+# face-plane error vs the box while the crate is at rest].
+func _tall_push_hands(am: Node, b: RigidBody3D, half: float, ticks: int) -> Array:
+	var r := [0, INF, -INF, -INF, 0.0, 0.0]
+	for n in ticks:
+		await tick()
+		if not pc.is_pushing or float(am.push_w) < 0.99 or n < secs(1.0):
+			continue
+		r[0] += 1
+		# The bones read here were posed in the last _process, against the
+		# crate as drawn then (the test resumes one physics step later, so
+		# the body itself is already 1 tick ahead). Use the animator's face
+		# plane; the static heavy crate checks that plane against the box.
+		var pf: Plane = am.push_face
+		var cc := b.get_global_transform_interpolated().origin
+		var nrm := Vector3(pc.global_position.x - cc.x, 0, pc.global_position.z - cc.z).normalized()
+		if b.linear_velocity.length() < 0.01:
+			r[5] = maxf(r[5], absf(pf.d - (cc.dot(nrm) + half)))
+		for i in 2:
+			var hw: Vector3 = am.get_final_bone_world("hand_l" if i == 0 else "hand_r")
+			r[1] = minf(r[1], hw.y - pc.global_position.y)
+			r[2] = maxf(r[2], hw.y - pc.global_position.y)
+			r[3] = maxf(r[3], pf.distance_to(hw))
+			r[4] = maxf(r[4], hw.distance_to(am.push_hand_t[i]))
+	return r
 
 
 func t_camera() -> void:
