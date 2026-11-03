@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 103
+const EXPECTED_TOTAL := 105
 
 
 func want(name: String) -> bool:
@@ -1271,6 +1271,7 @@ func t_anim() -> void:
 	#     warp < 5 deg and (strafe) the feet really cross (order along the
 	#     movement swaps both ways by > 8 cm); AIM_WARP=1: legs pointing
 	#     within 25 deg of the movement (or its reverse)
+	var arm_fwd := {}   # aim_fwd hand swing ranges (reference for the strafe arms)
 	for spec in [["aim_fwd", ["move_forward"]], ["strafe_left", ["move_left"]], ["strafe_right", ["move_right"]],
 			["backpedal", ["move_back"]], ["diag_fl", ["move_forward", "move_left"]], ["diag_br", ["move_back", "move_right"]]]:
 		var res := {}
@@ -1308,10 +1309,26 @@ func t_anim() -> void:
 			var sw_t: Array[float] = []
 			var up := {}
 			var pel_min := INF
+			var arm_r: Array[float] = [INF, -INF, INF, -INF, INF, -INF, INF, -INF]
 			for n in n_s:
 				var was_cd: Array = fk.cooldown.duplicate()
 				await tick()
 				pel_min = minf(pel_min, _bone_world("pelvis").y - pc.global_position.y)
+				# hands vs the chest (shoulder-line frame): fore-aft / sideways swing
+				var cl := _bone_world("clavicle_l")
+				var cr := _bone_world("clavicle_r")
+				var lft := (cl - cr) * Vector3(1, 0, 1)
+				lft = lft.normalized()
+				var fwd_c := lft.cross(Vector3.UP)
+				var cm := (cl + cr) * 0.5
+				for hi in 2:
+					var hp := _bone_world(["hand_l", "hand_r"][hi]) - cm
+					var fa := hp.dot(fwd_c)
+					var la := hp.dot(lft)
+					arm_r[hi * 4] = minf(arm_r[hi * 4], fa)
+					arm_r[hi * 4 + 1] = maxf(arm_r[hi * 4 + 1], fa)
+					arm_r[hi * 4 + 2] = minf(arm_r[hi * 4 + 2], la)
+					arm_r[hi * 4 + 3] = maxf(arm_r[hi * 4 + 3], la)
 				var hv := pc.velocity * Vector3(1, 0, 1)
 				var mdir := hv.normalized()
 				var floor_y := pc.global_position.y
@@ -1394,6 +1411,8 @@ func t_anim() -> void:
 				res["cross"] = minf(-cross_lo, cross_hi)
 				res["wide"] = maxf(-cross_lo, cross_hi)
 				res["pel_min"] = pel_min
+				res["arm_fa"] = 0.5 * ((arm_r[1] - arm_r[0]) + (arm_r[5] - arm_r[4]))
+				res["arm_lat"] = 0.5 * ((arm_r[3] - arm_r[2]) + (arm_r[7] - arm_r[6]))
 				res["twist"] = tw_hi - tw_lo
 				res["hip_yaw"] = hy_hi - hy_lo
 				res["chest_yaw"] = cy_hi - cy_lo
@@ -1437,6 +1456,15 @@ func t_anim() -> void:
 			metric("anim_%s_cross_m" % spec[0], res["cross"])
 		metric("anim_%s_stance_max_m" % spec[0], res["wide"])
 		metric("anim_%s_pelvis_min_m" % spec[0], res.get("pel_min", -1.0))
+		metric("anim_%s_hand_fore_aft_range_m" % spec[0], res.get("arm_fa", -1.0))
+		metric("anim_%s_hand_side_range_m" % spec[0], res.get("arm_lat", -1.0))
+		if spec[0] == "aim_fwd":
+			arm_fwd = {"fa": res["arm_fa"], "lat": res["arm_lat"]}
+		elif spec[0] in ["strafe_left", "strafe_right"] and _anim.has_aim_set and not arm_fwd.is_empty():
+			# round 7: strafe-specific arms -- less fore-aft (walk) swing, more
+			# sideways swing than the aimed forward gait's arms
+			check("anim_%s_arms" % spec[0], res["arm_fa"] < 0.6 * arm_fwd["fa"] and res["arm_lat"] > 1.5 * arm_fwd["lat"],
+				"hand swing fore-aft %.3f m (aim_fwd %.3f), sideways %.3f m (aim_fwd %.3f)" % [res["arm_fa"], arm_fwd["fa"], res["arm_lat"], arm_fwd["lat"]])
 		metric("anim_%s_hip_chest_twist_deg" % spec[0], res["twist"])
 		metric("anim_%s_hip_yaw_range_deg" % spec[0], res["hip_yaw"])
 		metric("anim_%s_chest_yaw_range_deg" % spec[0], res["chest_yaw"])

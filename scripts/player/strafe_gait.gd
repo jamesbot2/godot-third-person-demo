@@ -15,7 +15,9 @@ extends RefCounted
 ##  * all lateral clips: the hips counter-rotate (HIP_YAW) against the
 ##    clip's shoulder swing; spine_01 takes the inverse (chest unchanged).
 ##  * strafe_l / strafe_r: CROSS-STEP side gait. Upper body, arms and pelvis
-##    motion are aim_fwd's own (CC0-derived); the legs are re-solved per key
+##    motion start from aim_fwd's own (CC0-derived); round 7 re-poses the
+##    upper body for the side step (_strafe_upper: damped walk arm swing,
+##    arms out + sideways swing, lean into the movement); the legs are re-solved per key
 ##    with an analytic two-bone IK so the ankles follow an authored lateral
 ##    trajectory: the stance foot moves sideways at exactly one stride per
 ##    cycle (zero clip slip by construction when the cycle rate is
@@ -56,6 +58,17 @@ const BD_SKEW := 1.6
 const HIP_YAW := 7.0
 ## max hip->ankle reach as a fraction of the straight leg
 const REACH := 0.965
+## round 7: strafe-specific upper body (scaled by |dir.x|): the CC0 forward
+## arm swing is damped toward the idle arms (ARM_DAMP), the arms are held a
+## little out from the body for balance (ARM_ABD, deg) and swing sideways
+## with the step (ARM_SIDE, deg; one swing per cycle), and the chest leans
+## into the movement (LEAN, deg) with a small sway over each stance foot
+## (SWAY, deg, twice per cycle)
+const ARM_DAMP := 0.6
+const ARM_ABD := 7.0
+const ARM_SIDE := 9.0
+const LEAN := 3.5
+const SWAY := 2.0
 ## round 6 re-posed aim_fwd / aim_bwd (see build): stance fraction, swing
 ## lift (m), stance width scale, stance centre offset along the movement (m;
 ## 0 measured best for the backpedal swing knee). Round 7: FB_DUTY 0.42 ->
@@ -301,6 +314,8 @@ static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vec
 			var sp_g: Basis = (gp[b_sp] as Transform3D).basis
 			var pel_g: Basis = pb * hb
 			loc[b_sp] = Transform3D(pel_g.inverse() * sp_g, (loc[b_sp] as Transform3D).origin)
+		if cross > 0.01:
+			_strafe_upper(skel, loc, idle_loc, cross, signf(dvec.x), float(k) / n)
 		var g := _fk(skel, loc)
 		for sd in ["l", "r"]:
 			var L: Dictionary = legs[sd]
@@ -316,6 +331,44 @@ static func dir_frames(skel: Skeleton3D, base: Array, idle_loc: Array, dvec: Vec
 			g = _fk(skel, loc)
 		out.append(loc)
 	return out
+
+
+## Rotates bone b about a SKELETON-space axis through its own origin
+## (children follow).
+static func _rot_global(skel: Skeleton3D, loc: Array, b: int, axis: Vector3, deg: float) -> void:
+	if b < 0 or absf(deg) < 1e-4:
+		return
+	var p := skel.get_bone_parent(b)
+	var pb: Basis = (_fk(skel, loc)[p] as Transform3D).basis if p >= 0 else Basis.IDENTITY
+	var l: Transform3D = loc[b]
+	loc[b] = Transform3D(pb.inverse() * Basis(axis, deg_to_rad(deg)) * pb * l.basis, l.origin)
+
+
+## Strafe upper body (see ARM_DAMP .. SWAY). w = |dir.x|, sgn = sign of the
+## movement along +X (character left), u = cycle phase.
+static func _strafe_upper(skel: Skeleton3D, loc: Array, idle_loc: Array, w: float, sgn: float, u: float) -> void:
+	# chest lean into the movement + sway over the stance foot (left
+	# contact at u = 0, right at 0.5: sway toward the stance side)
+	var sp := skel.find_bone("spine_02")
+	var sway := SWAY * cos(TAU * u * 2.0) * (1.0 if fposmod(u + 0.25, 1.0) < 0.5 else -1.0)
+	# rotation about +Z by +a tips the chest toward -X
+	_rot_global(skel, loc, sp, Vector3(0, 0, 1), -(LEAN * sgn + sway) * w)
+	for sd in ["l", "r"]:
+		var side := 1.0 if sd == "l" else -1.0
+		for bn in ["upperarm_", "lowerarm_"]:
+			var b := skel.find_bone(bn + sd)
+			if b < 0:
+				continue
+			var l: Transform3D = loc[b]
+			var q := l.basis.get_rotation_quaternion().slerp((idle_loc[b] as Transform3D).basis.get_rotation_quaternion(), ARM_DAMP * w)
+			loc[b] = Transform3D(Basis(q), l.origin)
+		# +Z rotation swings a hanging arm toward +X: abduct = +side; the
+		# sideways swing is the same for both arms and locked to the legs
+		# (the crossing leg of strafe_l swings half a cycle after strafe_r's,
+		# and the direction flips too: the two cancel, so the swing is
+		# mirror-symmetric without a sgn term)
+		var a := ARM_ABD * side - ARM_SIDE * cos(TAU * u)
+		_rot_global(skel, loc, skel.find_bone("upperarm_" + sd), Vector3(0, 0, 1), a * w)
 
 
 ## Blend-space points: name, 2D position (x = right, y = forward), stride
