@@ -36,6 +36,46 @@ func _initialize() -> void:
 func tick(n := 1) -> void:
 	for i in n:
 		await physics_frame
+		if _pop_on:
+			_pop_sample()
+
+
+## Round 4 "pop" probe: per rendered frame, world positions of the main body
+## points; the largest second difference |x[n+1]-2x[n]+x[n-1]| is a sudden
+## position/velocity step. A true teleport of D metres gives ~D at any rate;
+## smooth motion gives ~a/hz^2. Reported as the velocity jump (2nd diff * hz).
+const POP_BONES := ["pelvis", "Head", "hand_l", "hand_r", "foot_l", "foot_r", "calf_l", "calf_r"]
+var _pop_on := false
+var _pop_hist: Array = []
+var _pop_max := 0.0
+var _pop_bone := ""
+
+
+func _pop_begin() -> void:
+	_pop_on = true
+	_pop_hist = []
+	_pop_max = 0.0
+	_pop_bone = ""
+
+
+func _pop_sample() -> void:
+	var cur := {}
+	for b in POP_BONES:
+		cur[b] = _bone_world(b)
+	_pop_hist.append(cur)
+	if _pop_hist.size() > 3:
+		_pop_hist.pop_front()
+	if _pop_hist.size() == 3:
+		for b in POP_BONES:
+			var d2: Vector3 = _pop_hist[2][b] - 2.0 * _pop_hist[1][b] + _pop_hist[0][b]
+			if d2.length() > _pop_max:
+				_pop_max = d2.length()
+				_pop_bone = b
+
+
+func _pop_end() -> Dictionary:
+	_pop_on = false
+	return {"d2": _pop_max, "vjump": _pop_max * hz, "bone": _pop_bone}
 
 
 func secs(t: float) -> int:
@@ -93,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 96
+const EXPECTED_TOTAL := 97
 
 
 func want(name: String) -> bool:
@@ -944,6 +984,13 @@ func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary
 			if p.z < z_face and p.z > z_back and p.y < top_y:
 				pen = maxf(pen, minf(top_y - p.y, minf(z_face - p.z, p.z - z_back)))
 		if OS.has_environment("TRACE_TRAVERSE"):
+			var pl := "POP %.3f" % _anim.get_traverse_progress()
+			var cg: Vector3 = pc.global_position; var mg: Vector3 = _anim.global_position
+			pl += " cap %.4f %.4f %.4f model %.4f %.4f %.4f" % [cg.x, cg.y, cg.z, mg.x, mg.y, mg.z]
+			for b in ["pelvis", "Head", "hand_l", "hand_r", "foot_l", "foot_r", "calf_l", "calf_r", "spine_03"]:
+				var bw := _bone_world(b)
+				pl += " %s %.4f %.4f %.4f" % [b, bw.x, bw.y, bw.z]
+			print(pl)
 			var hl := _bone_world("hand_l"); var hr := _bone_world("hand_r")
 			var fl := _bone_world("foot_l"); var fr := _bone_world("foot_r")
 			var bl := _bone_world("ball_l"); var br := _bone_world("ball_r")
@@ -1330,10 +1377,13 @@ func t_anim() -> void:
 	await place(Vector3(L.VAULT_X, 0.02, L.VAULT_Z + 3.0))
 	press("move_forward")
 	await walk_until_z(L.VAULT_Z + 1.0, 2.0)
+	_pop_begin()
 	press("jump")
 	var saw_vault := await _wait_anim("vault", 1.0)
 	# contact: hands come down onto the wall top, feet never inside the wall
 	var v := await _traverse_contact(L.VAULT_H, L.VAULT_Z, L.VAULT_Z - L.VAULT_T)
+	await tick(secs(0.25))
+	var vpop := _pop_end()
 	release_all()
 	await tick(secs(1.0))
 	# round 3: tightened from hand<0.12 / pen<0.04 (joint) to palm-level contact
@@ -1342,12 +1392,21 @@ func t_anim() -> void:
 	await place(Vector3(L.MANTLE_X, 0.02, L.MANTLE_Z + 1.0))
 	press("move_forward")
 	await tick(secs(0.4))
+	_pop_begin()
 	press("jump")
 	var saw_mantle := await _wait_anim("mantle", 1.0)
 	var m := await _traverse_contact(L.MANTLE_H, L.MANTLE_Z, L.MANTLE_Z - 3.0)
+	await tick(secs(0.25))
+	var mpop := _pop_end()
 	release_all()
 	await tick(secs(0.8))
 	check("anim_mantle_contact", m["hand"] < 0.04 and m["hand_frames"] >= secs(0.3) and m["planted_err"] < 0.01 and m["hpen"] < 0.02 and m["pen"] < 0.025,
 		"closest hand-to-ledge=%.3f m  frames within 8 cm=%d (%.2f s)  planted wrist err=%.3f m  hand penetration=%.3f m  max sole penetration=%.3f m" % [m["hand"], m["hand_frames"], m["hand_frames"] / float(Engine.physics_ticks_per_second), m["planted_err"], m["hpen"], m["pen"]])
+	# round 4: no single-frame pops from jump press to 0.25 s after landing
+	# (pre-fix: ~1.3 m mantle-entry teleport; 0.25-0.4 m/frame at 60 Hz)
+	metric("anim_vault_pop_m", vpop["d2"])
+	metric("anim_mantle_pop_m", mpop["d2"])
+	check("anim_traverse_pops", vpop["vjump"] < 12.0 and mpop["vjump"] < 12.0,
+		"largest per-frame 2nd difference of body points: vault %.3f m (%s, %.1f m/s velocity jump)  mantle %.3f m (%s, %.1f m/s)" % [vpop["d2"], vpop["bone"], vpop["vjump"], mpop["d2"], mpop["bone"], mpop["vjump"]])
 	check("anim_traverse_states", saw_vault and saw_mantle and _anim.anim_state == "ground", "vault=%s mantle=%s end=%s" % [saw_vault, saw_mantle, _anim.anim_state])
 

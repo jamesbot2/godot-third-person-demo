@@ -439,12 +439,22 @@ func _build_tree() -> AnimationNodeStateMachine:
 		vt.connect_node("output", 0, _blend2(vt, "tuck_mix", vc, vtuck, Vector2(300, 100)))
 	sm.add_node("vault", vt, Vector2(900, 400))
 	var xfade := {"ground": 0.18, "jump": 0.08, "air": 0.2, "slide": 0.12, "slide_exit": 0.1,
-		"roll": 0.10, "mantle": 0.1, "vault": 0.1}
+		"roll": 0.10, "mantle": 0.15, "vault": 0.15}
+	# ease-in/out crossfade weight: a linear xfade ends with a velocity step
+	# (a bone moving between two differently-moving poses snaps to the new
+	# pose's velocity in one frame -- ~0.2 m/frame foot "pop" at vault/mantle
+	# entry). Zero-slope ends remove that kink.
+	var ease := Curve.new()
+	ease.add_point(Vector2(0, 0), 0.0, 0.0)
+	ease.add_point(Vector2(1, 1), 0.0, 0.0)
+	var use_ease := OS.get_environment("XFADE_LINEAR") != "1"
 	for a in xfade:
 		for b in xfade:
 			if a != b:
 				var t := AnimationNodeStateMachineTransition.new()
 				t.xfade_time = xfade[b]
+				if use_ease:
+					t.xfade_curve = ease
 				t.switch_mode = AnimationNodeStateMachineTransition.SWITCH_MODE_IMMEDIATE
 				sm.add_transition(a, b, t)
 	return sm
@@ -875,6 +885,7 @@ var _core_inset := 0.07
 var _core_w := [0.0, 0.0]          # effective (reach-gated, rate-limited) plant blend
 const CORE_PLAN_N := 96
 var _core_lift := PackedFloat32Array()   # planned extra root lift over u
+var _post_s := Vector4.ZERO   # post-pass reach residual spring (dy, dy', df, df')
 
 
 ## Capsule position along the traverse at progress u (mirror of
@@ -920,13 +931,16 @@ func _core_plan_w(mantle: bool, u: float) -> float:
 ## the face), and the result is smoothed so nothing pops. The post pass then
 ## only fixes small residuals against the pose actually drawn.
 func _plan_core_lift(mantle: bool, cap_now: Vector3) -> void:
+	_post_s = Vector4.ZERO
 	var off := global_position - cap_now
 	var off_f := off.dot(_tr_fwd)
 	var N := CORE_PLAN_N
 	var base := PackedFloat32Array()
 	var feet := PackedFloat32Array()
+	var floor_need := PackedFloat32Array()
 	base.resize(N + 1)
 	feet.resize(N + 1)
+	floor_need.resize(N + 1)
 	var plant_y := _tr_top + PALM_H
 	var plant_f := _tr_edge_f + _core_inset_for(mantle)
 	for k in N + 1:
@@ -951,12 +965,17 @@ func _plan_core_lift(mantle: bool, cap_now: Vector3) -> void:
 			o = lerpf(o, clampf(o, lo, maxf(lo, hi)), w)
 		base[k] = o
 		var fneed := -INF
+		var flo := -INF
 		for b in ClipSampler.SOLE:
 			var p := _core_sole(mantle, b, u)
 			var f := root_f - p.z
 			if f > _tr_edge_f + 0.005 and f < _tr_back_f + 0.06:
 				fneed = maxf(fneed, _tr_top + 0.02 - (by + p.y - float(ClipSampler.SOLE[b])))
+			# never under the start floor (the post pass clamp, planned here
+			# so the hand-over between it and the top-of-obstacle lift is smooth)
+			flo = maxf(flo, _tr_start_y - (by + p.y - float(ClipSampler.SOLE[b])))
 		feet[k] = fneed
+		floor_need[k] = flo
 	# smooth the base path (moving average, +-0.06 u)
 	var R := int(0.1 * N)
 	var sm := PackedFloat32Array()
@@ -981,7 +1000,25 @@ func _plan_core_lift(mantle: bool, cap_now: Vector3) -> void:
 			var d := float(j - k)
 			var ramp := smoothstep(win, 0.0, d) if d >= 0.0 else smoothstep(win * 0.5, 0.0, -d)
 			m = maxf(m, need * ramp)
-		_core_lift[k] = sm[k] + m
+		_core_lift[k] = maxf(sm[k] + m, floor_need[k])
+	# envelope smoothing: running max then running mean over the same window,
+	# so the result stays >= every constraint but has no kinks where the
+	# active constraint switches (that switch was a single-frame pop)
+	var W := 5
+	var dil := PackedFloat32Array()
+	dil.resize(N + 1)
+	for k in N + 1:
+		var mx := -INF
+		for j in range(maxi(0, k - W), mini(N, k + W) + 1):
+			mx = maxf(mx, _core_lift[j])
+		dil[k] = mx
+	for k in N + 1:
+		var acc := 0.0
+		var cnt := 0.0
+		for j in range(maxi(0, k - W), mini(N, k + W) + 1):
+			acc += dil[j]
+			cnt += 1.0
+		_core_lift[k] = acc / cnt
 	if OS.get_environment("TRACE_TRAVERSE") != "":
 		var sn := ""
 		for k in range(0, N + 1, 4):
@@ -1126,18 +1163,71 @@ func _core_traverse_post() -> void:
 		lo = maxf(lo, (plant.y - vr - sh.y) * w)   # shoulder not too far below
 		hi = minf(hi, (plant.y + vr - sh.y) * w)   # ... nor too far above
 	dy = lo if lo > 0.0 else hi
-	# 2) soles: lifted over the top as they approach the front face (the lift
-	# ramps in over the last 25 cm of horizontal approach so it stays
-	# continuous: no pops), never under the start floor
+	# 2) soles: a sole inside the block is lifted over its top or the body
+	# is held back from the face, whichever is cheaper; never under the start
+	# floor. (Round 4: the old 25 cm anticipation ramp lifted the whole body
+	# by up to top-minus-sole (~1.3 m) within a few frames at mantle entry.)
 	var lift := 0.0
+	var push := 0.0
 	for b in ClipSampler.SOLE:
 		var p: Vector3 = P.call(b) - Vector3(0, ClipSampler.SOLE[b], 0)
 		p += Vector3.UP * dy + _tr_fwd * df
 		var f := p.dot(_tr_fwd)
 		if f < _tr_back_f + 0.02 and p.y < _tr_top + 0.005:
-			var gap := (_tr_edge_f - 0.01) - f
-			lift = maxf(lift, (_tr_top + 0.005 - p.y) * (1.0 - smoothstep(0.0, 0.25, gap)))
+			# only a sole actually inside the block is corrected, by the
+			# cheaper of lifting it over the top or holding the body back
+			# from the face (soft choice so the switch cannot pop)
+			var pen := (f - (_tr_edge_f - 0.01))
+			if pen > 0.0:
+				var need_up := _tr_top + 0.005 - p.y
+				var w := smoothstep(-0.05, 0.05, need_up - pen)
+				lift = maxf(lift, need_up * (1.0 - w))
+				push = maxf(push, pen * w)
 		lift = maxf(lift, _tr_start_y - 0.005 - p.y)
+	df -= push
+	# the post corrections are per-frame residuals of the plan; feed them
+	# through a critically damped spring so a constraint switching on/off
+	# (or the plan/pose mismatch changing slope) cannot pop the body
+	dy += lift
+	var sdt := 1.0 / float(Engine.physics_ticks_per_second)
+	var om := float(OS.get_environment("POST_OM")) if OS.get_environment("POST_OM") != "" else 20.0
+	# exact critically damped step (frame-rate independent, stable at 30 Hz)
+	var ex := exp(-om * sdt)
+	var ey := _post_s.x - dy
+	var jy := (_post_s.y + om * ey) * sdt
+	_post_s.x = dy + (ey + jy) * ex
+	_post_s.y = (_post_s.y - om * jy) * ex
+	var ef := _post_s.z - df
+	var jf := (_post_s.w + om * ef) * sdt
+	_post_s.z = df + (ef + jf) * ex
+	_post_s.w = (_post_s.w - om * jf) * ex
+	# hard guarantee after the smoothing: whatever penetration the lag left
+	# is projected out (and folded into the spring state so it stays smooth
+	# from the next frame on). Usually a few mm.
+	lift = 0.0
+	push = 0.0
+	for b in ClipSampler.SOLE:
+		var p: Vector3 = P.call(b) - Vector3(0, ClipSampler.SOLE[b], 0)
+		p += Vector3.UP * _post_s.x + _tr_fwd * _post_s.z
+		var f := p.dot(_tr_fwd)
+		if f < _tr_back_f + 0.02 and p.y < _tr_top + 0.005:
+			var pen := (f - (_tr_edge_f - 0.01))
+			if pen > 0.0:
+				var need_up := _tr_top + 0.005 - p.y
+				var w := smoothstep(-0.05, 0.05, need_up - pen)
+				lift = maxf(lift, need_up * (1.0 - w))
+				push = maxf(push, pen * w)
+		lift = maxf(lift, _tr_start_y - 0.005 - p.y)
+	_post_s.x += lift
+	_post_s.z -= push
+	dy = _post_s.x
+	df = _post_s.z
+	lift = 0.0
+	if OS.get_environment("TRACE_TRAVERSE") != "":
+		var lows := INF
+		for b in ClipSampler.SOLE:
+			lows = minf(lows, (P.call(b) - Vector3(0, ClipSampler.SOLE[b], 0)).y)
+		print("POST u=%.3f base=%.3f reach_dy=%.3f lift=%.3f df=%.3f low_sole=%.3f start_y=%.3f anim_y=%.3f char_y=%.3f vis=%.3f top=%.3f" % [_core_u, _tr_off, dy, lift, df, lows, _tr_start_y, global_position.y, character.position.y, _vis_y, _tr_top])
 	dy += lift
 	_tr_off += dy
 	_tr_fwd_off += df
