@@ -144,16 +144,26 @@
 - `eval/sheet.py` 排除规则错误（漏了 `*contact*` 单图）已修，之前各轮总览图都缺这几张。
 - core 107/107 @30/60/120；extras 105/107（241df6f）。
 
-## 可恢复状态（2026-11-03，Cycle 14 之后）
+## Cycle 15 — Round 8（7cc6062, 82d46d0, ec27b27）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 107/107 @30/60/120 Hz；本机 extras 105/107。
+- 推箱子姿势（7cc6062）：腿部混入 0.35 蹲走、网格沿箱面法线后移 0.15 m、取消下沉、前倾 28°、新肘极点；膝离箱面 −0.04 → 0.13–0.21 m，后腿屈膝 34 → 62°，肘 110 → 117–137°。
+  高箱/叠箱：射线找叠放的最上层箱，箱顶比脚高 1.05 m 以上时双手放箱面胸口高度（min(顶 − 0.12, 脚 + 1.22)）；箱面平面改由所画箱子变换 + 碰撞盒尺寸算出。新增 `crate_push_pose`、`crate_tall_hands_on_face`、`crate_stack_pushes`；展示新增叠箱 / 重箱段与 3 张特写。
+  踩坑：后移 0.25 m 手臂伸直、够不到；测试读骨骼时箱体已多走一个物理 tick，看起来叠箱手离箱面 0.10–0.16 m，其实是测量时序问题，改为对动画器的 `push_face` 测量 + 静止重箱上校验平面。
+- 步态（82d46d0）：前向斜线单独的支撑占比 0.28 / 抬脚 0.12 / 切线 0.35，骨盆 0.75 → 0.81 m、站距 1.24 → 0.87–0.94 m；瞄准前进支撑占比 0.28、抬脚峰提前，膝前伸 0.375 → 0.352 m（IK 关闭时也是 0.375，片段自身的问题）。新增 `anim_diag_fl_posture`、`anim_aim_fwd_knee_lead`。
+- extras 的两项老失败没修（另一套翻越/攀爬驱动，不是小改动）。
+- core 112/112 @30/60/120；extras 110/112（ec27b27）。
+
+## 可恢复状态（2026-11-03，Cycle 15 之后）
+
+- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推；将来只能 squash 合并**）。测试 core 112/112 @30/60/120 Hz；本机 extras 110/112。
 - 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`）；或
   `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz> [--only=t_anim]`；`UAL_EXTRAS=0` 强制 core；`FOOTIK_DEBUG=1` 打印锁脚跳脱。
-- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`、`ROLL_NOCAP=1`/`ROLL_CAP=<m>`、`ROLL_DROP_PLAIN=1`、`BWD_RAW=1`、`AIM_WARP=1`、`AIM_FB_RAW=1`、`PUSH_DEBUG=1`（推箱子逐 tick 打印手误差/前倾）。
+- 调试开关：`TRACE_TRAVERSE=1`、`ROLL_DEBUG=1`、`ROLLPROBE=1`、`ROLL_UNTUCKED=1`、`ROLL_NOCAP=1`/`ROLL_CAP=<m>`、`ROLL_DROP_PLAIN=1`、`BWD_RAW=1`、`AIM_WARP=1`、`AIM_FB_RAW=1`、`PUSH_DEBUG=1`。
+  调参环境变量：`PUSH_LEAN/PUSH_CROUCH/PUSH_BACK/PUSH_DROP/PUSH_LEAN_TALL/PUSH_BACK_TALL/PUSH_CROUCH_TALL`、`FD_DUTY/FD_LIFT/FD_NARROW/FD_TAN`、`FB_DUTY/FB_LIFT_F/FB_SKEW_F/FB_C_F`。
   新增 class_name 脚本后先跑一次 `godot --headless --editor --quit --path .` 刷新类缓存。
-- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round7`）；第 7 轮产物在 `/workspace/acceptance/round7/`。
-- 剩余问题：推箱子是很深的弓步（后腿过直、前膝贴近箱面、肘收紧）；高箱/叠箱走“正面”分支未可视化验证；
-  斜前方骨盆最低 0.75 m、站距 1.25 m；瞄准前进膝前伸 0.375 m（没有门限）；后退膝前伸只在脚离地 > 0.08 m 时采样；
+- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round8`）；第 8 轮产物在 `/workspace/acceptance/round8/`。
+- 剩余问题：推箱子手是握拳状（片段手型），推矮箱时前倾 48°（骨盆→颈）；肘部夹角随帧率变化（117–137°，60 Hz 离 115° 门限只差 2°）；
+  瞄准前进膝前伸 0.352 m（门限 0.36，余量小）；斜前方 120 Hz 站距 0.94 m（门限 1.0）、交叉步仍在；后退膝前伸只在脚离地 > 0.08 m 时采样；
   侧移上身幅度是手调的；30 Hz 翻越单帧跳变（门限内）；extras 模式 2 项失败（翻越/攀爬片段跳变、攀爬起身手臂）。
 - 未验收（需 M2 真机，按 README 试玩清单）：所有动态观感。
 
