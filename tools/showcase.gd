@@ -23,7 +23,7 @@ var main: Node
 var pc: PlayerController
 var rig: CameraRig
 var anim: Node
-var shots_dir := "/workspace/acceptance/round6"
+var shots_dir := "/workspace/acceptance/round7"
 var only: PackedStringArray = []
 var move_world := Vector3.ZERO   # desired world-space move direction (re-mapped every frame)
 var orbit_rate := 0.0            # camera yaw rad/s
