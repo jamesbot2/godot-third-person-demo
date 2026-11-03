@@ -133,7 +133,7 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
-const EXPECTED_TOTAL := 100
+const EXPECTED_TOTAL := 101
 
 
 func want(name: String) -> bool:
@@ -967,9 +967,14 @@ func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary
 	var pen := 0.0
 	var hpen := 0.0
 	var planted_err := 0.0
+	var raise := -INF
 	for n in secs(2.0):
 		if pc.state != PlayerController.State.TRAVERSE:
 			break
+		# round 5: released hands during the stand-up (u >= 0.75) -- height
+		# of the wrist above its shoulder (>0 = arm swinging up by the head)
+		if _anim.get_traverse_progress() >= 0.75:
+			raise = maxf(raise, _arm_raise(true))
 		var near := false
 		for h in ["hand_l", "hand_r"]:
 			var p := _bone_world(h)
@@ -1005,7 +1010,20 @@ func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary
 				_anim.get_traverse_progress(), _anim._tr_clip_t, hl.x, hl.y - top_y, hl.z, hr.x, hr.y - top_y, hr.z,
 				fl.y - top_y, fl.z, fr.y - top_y, fr.z, bl.y - top_y, bl.z, br.y - top_y, br.z, pc.global_position.y, pc.global_position.z, _anim.hand_w[0], _anim.hand_w[1]])
 		await tick()
-	return {"hand": best, "hand_frames": close, "pen": pen, "hpen": hpen, "planted_err": planted_err}
+	return {"hand": best, "hand_frames": close, "pen": pen, "hpen": hpen, "planted_err": planted_err, "raise": raise}
+
+
+## Highest wrist-above-own-shoulder of the hands not planted (m).
+func _arm_raise(skip_planted: bool) -> float:
+	var r := -INF
+	for i in 2:
+		if skip_planted and _anim.hand_contact[i]:
+			continue
+		var sd := "l" if i == 0 else "r"
+		r = maxf(r, _bone_world("hand_" + sd).y - _bone_world("upperarm_" + sd).y)
+	if OS.has_environment("ARM_DEBUG"):
+		print("ARM u=%.2f st=%s raise=%.3f hl=%.3f hr=%.3f" % [_anim.get_traverse_progress(), pc.get_state_name(), r, _bone_world("hand_l").y - _bone_world("upperarm_l").y, _bone_world("hand_r").y - _bone_world("upperarm_r").y])
+	return r
 
 
 ## Per tick while GROUND: sole clearance of the LOWER foot over the real
@@ -1478,12 +1496,21 @@ func t_anim() -> void:
 	press("jump")
 	var saw_mantle := await _wait_anim("mantle", 1.0)
 	var m := await _traverse_contact(L.MANTLE_H, L.MANTLE_Z, L.MANTLE_Z - 3.0)
-	await tick(secs(0.25))
+	var m_raise: float = m["raise"]
+	for n in secs(0.25):
+		await tick()
+		m_raise = maxf(m_raise, _arm_raise(false))
 	var mpop := _pop_end()
 	release_all()
 	await tick(secs(0.8))
 	check("anim_mantle_contact", m["hand"] < 0.04 and m["hand_frames"] >= secs(0.3) and m["planted_err"] < 0.01 and m["hpen"] < 0.02 and m["pen"] < 0.025,
 		"closest hand-to-ledge=%.3f m  frames within 8 cm=%d (%.2f s)  planted wrist err=%.3f m  hand penetration=%.3f m  max sole penetration=%.3f m" % [m["hand"], m["hand_frames"], m["hand_frames"] / float(Engine.physics_ticks_per_second), m["planted_err"], m["hpen"], m["pen"]])
+	# round 5: mantle stand-up -- released arms must not swing up beside the
+	# head (pre-fix the climb clip's next reach lifted a free wrist to -0.19..-0.23 m below its
+	# shoulder while the body stood up on the top)
+	metric("anim_mantle_standup_arm_raise_m", m_raise)
+	check("anim_mantle_standup_arms", m_raise < -0.25,
+		"stand-up (u>=0.75 .. 0.25 s after): highest free wrist relative to its shoulder=%.3f m (want < -0.25)" % m_raise)
 	# round 4: no single-frame pops from jump press to 0.25 s after landing
 	# (pre-fix: ~1.3 m mantle-entry teleport; 0.25-0.4 m/frame at 60 Hz)
 	metric("anim_vault_pop_m", vpop["d2"])

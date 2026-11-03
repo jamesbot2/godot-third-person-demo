@@ -116,6 +116,9 @@ const MANTLE_REL_R := 0.84
 const MANTLE_REL_L := 0.95
 const MANTLE_FEET := 0.91
 const MANTLE_END := 1.30
+## Released-hand hang during the core mantle stand-up: wrist this fraction of
+## the arm length below its shoulder (straight arm = 1.0).
+const MANTLE_HANG_DROP := 0.85
 ## core mode (Standard "climb" = UAL2 ClimbUp_1m loop) window
 const CLIMB_T0 := 0.10
 const CLIMB_T1 := 0.667
@@ -1274,6 +1277,17 @@ func _core_traverse_post() -> void:
 		var we: float = _core_w[i]
 		var tgt := fk.lerp(plant, smoothstep(0.0, 1.0, we))
 		tgt.y = lerpf(fk.y, plant.y + 0.10 * (1.0 - we), smoothstep(0.0, 0.6, we)) if we < 0.999 else plant.y
+		# Round 5: mantle stand-up. Once a hand has let go of the ledge the
+		# FK hand is the climb loop's NEXT reach, which swung the free arm up
+		# beside the head while the body stood up. Pull released hands down
+		# to a relaxed hang beside the thigh instead (the IK is fully on for
+		# the whole traverse, so this only moves the target).
+		if _pc.get_state_name() == "MANTLE":
+			var rr := smoothstep(0.5, 0.8, _core_u) * (1.0 - we)
+			if rr > 0.0:
+				var hang := sh + Vector3.DOWN * L * MANTLE_HANG_DROP + _tr_fwd * 0.05 \
+					+ right * (-1.0 if i == 0 else 1.0) * 0.07
+				tgt = tgt.lerp(hang, rr)
 		# keep the wrist out of the obstacle box (palm ~3 cm under the wrist)
 		var f := tgt.dot(_tr_fwd)
 		if f > _tr_edge_f - 0.04 and f < _tr_back_f + 0.04 and tgt.y < _tr_top + PALM_H:
