@@ -94,24 +94,35 @@ RESULT|PASS|fuzz_no_launch|max vy=4.67 []
 RESULT|PASS|fuzz_no_fall_through|min y=0.000
 RESULT|PASS|fuzz_no_stuck_action_state|longest SLIDE/ROLL/TRAVERSE run=0.57s
 RESULT|PASS|anim_setup|bones=65 active=true
-METRIC|anim_idle_foot_y|0.0017
-RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.002 tpose=false
-METRIC|anim_walk_slip_med|0.5708
-METRIC|anim_walk_min_foot_y|-0.0236
-METRIC|anim_walk_slip_drift|-0.0576
-RESULT|PASS|anim_walk|v=1.80 gait=0.20 style=0.00 rate=0.97 slip_med=0.57m/s drift=-0.06m/s n=21 min_foot_y=-0.024
-METRIC|anim_jog_slip_med|0.7534
-METRIC|anim_jog_min_foot_y|-0.0355
-METRIC|anim_jog_slip_drift|-0.2891
-RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.75m/s drift=-0.29m/s n=16 min_foot_y=-0.035
-METRIC|anim_sprint_slip_med|1.0180
-METRIC|anim_sprint_min_foot_y|-0.0251
-METRIC|anim_sprint_slip_drift|0.2841
-RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=1.02m/s drift=0.28m/s n=14 min_foot_y=-0.025
+METRIC|anim_idle_foot_y|0.0234
+RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.023 tpose=false
+METRIC|anim_walk_slip_p90|0.0000
+METRIC|anim_walk_slip_med|0.0000
+METRIC|anim_walk_min_foot_y|0.0231
+METRIC|anim_walk_slip_drift|0.0000
+RESULT|PASS|anim_walk|v=1.80 gait=0.20 style=0.00 rate=0.97 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=21 min_foot_y=0.023
+METRIC|anim_jog_slip_p90|0.0000
+METRIC|anim_jog_slip_med|0.0000
+METRIC|anim_jog_min_foot_y|0.0231
+METRIC|anim_jog_slip_drift|0.0000
+RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=16 min_foot_y=0.023
+METRIC|anim_sprint_slip_p90|1.4931
+METRIC|anim_sprint_slip_med|0.0000
+METRIC|anim_sprint_min_foot_y|0.0231
+METRIC|anim_sprint_slip_drift|0.4662
+RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=1.49m/s drift=0.47m/s n=11 min_foot_y=0.023
+METRIC|anim_stairs_foot_pen|0.0000
+METRIC|anim_stairs_foot_gap_med|0.0000
+METRIC|anim_stairs_foot_gap_p90|0.0341
+RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.034 m  max penetration=0.000 m  n=196 max_y=1.80
+METRIC|anim_ramp20_foot_pen|0.0000
+METRIC|anim_ramp20_foot_gap_med|0.0134
+METRIC|anim_ramp20_foot_gap_p90|0.0578
+RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.013 m p90=0.058 m  max penetration=0.000 m  n=150 max_y=1.02
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.40
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.06
 RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.13
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.095 m  max foot penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.045 m  frames within 8 cm=6  max foot penetration=0.035 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=30|pass=84|fail=0
+SUMMARY|hz=30|pass=86|fail=0

@@ -49,8 +49,6 @@ METRIC|jump_airtime_s|0.6833
 RESULT|PASS|jump_full_height|apex=0.900 expect=0.90 airtime=0.683s
 METRIC|jump_tap_apex_m|0.3931
 RESULT|PASS|jump_variable_tap|tap apex=0.393
-WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
-     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 RESULT|PASS|no_bhop_gain|max h-speed over 6 chained jumps=6.800
 RESULT|PASS|coyote_0.07s|delay=0.07 jumped=true vy=4.33
 RESULT|PASS|coyote_0.20s|delay=0.20 jumped=false vy=-4.65
@@ -96,24 +94,35 @@ RESULT|PASS|fuzz_no_launch|max vy=4.54 []
 RESULT|PASS|fuzz_no_fall_through|min y=0.000
 RESULT|PASS|fuzz_no_stuck_action_state|longest SLIDE/ROLL/TRAVERSE run=0.58s
 RESULT|PASS|anim_setup|bones=65 active=true
-METRIC|anim_idle_foot_y|0.0007
-RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.001 tpose=false
-METRIC|anim_walk_slip_med|0.5581
-METRIC|anim_walk_min_foot_y|-0.0236
-METRIC|anim_walk_slip_drift|-0.1076
-RESULT|PASS|anim_walk|v=1.80 gait=0.20 style=0.00 rate=0.97 slip_med=0.56m/s drift=-0.11m/s n=53 min_foot_y=-0.024
-METRIC|anim_jog_slip_med|0.7914
-METRIC|anim_jog_min_foot_y|-0.0364
-METRIC|anim_jog_slip_drift|-0.1703
-RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.79m/s drift=-0.17m/s n=33 min_foot_y=-0.036
-METRIC|anim_sprint_slip_med|0.8983
-METRIC|anim_sprint_min_foot_y|-0.0266
-METRIC|anim_sprint_slip_drift|0.1167
-RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.90m/s drift=0.12m/s n=23 min_foot_y=-0.027
+METRIC|anim_idle_foot_y|0.0229
+RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.023 tpose=false
+METRIC|anim_walk_slip_p90|0.0000
+METRIC|anim_walk_slip_med|0.0000
+METRIC|anim_walk_min_foot_y|0.0231
+METRIC|anim_walk_slip_drift|0.0000
+RESULT|PASS|anim_walk|v=1.80 gait=0.20 style=0.00 rate=0.97 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=52 min_foot_y=0.023
+METRIC|anim_jog_slip_p90|0.0000
+METRIC|anim_jog_slip_med|0.0000
+METRIC|anim_jog_min_foot_y|0.0231
+METRIC|anim_jog_slip_drift|0.0000
+RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=33 min_foot_y=0.023
+METRIC|anim_sprint_slip_p90|0.0000
+METRIC|anim_sprint_slip_med|0.0000
+METRIC|anim_sprint_min_foot_y|0.0231
+METRIC|anim_sprint_slip_drift|0.0216
+RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.02m/s n=19 min_foot_y=0.023
+METRIC|anim_stairs_foot_pen|0.0000
+METRIC|anim_stairs_foot_gap_med|0.0022
+METRIC|anim_stairs_foot_gap_p90|0.0461
+RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.002 m p90=0.046 m  max penetration=0.000 m  n=390 max_y=1.80
+METRIC|anim_ramp20_foot_pen|0.0008
+METRIC|anim_ramp20_foot_gap_med|0.0088
+METRIC|anim_ramp20_foot_gap_p90|0.0588
+RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.009 m p90=0.059 m  max penetration=0.001 m  n=300 max_y=1.01
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.41
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
-RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.13
+RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.12
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.087 m  max foot penetration=0.000 m
 RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.015 m  frames within 8 cm=11  max foot penetration=0.034 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
-SUMMARY|hz=60|pass=84|fail=0
+SUMMARY|hz=60|pass=86|fail=0

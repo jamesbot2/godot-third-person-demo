@@ -23,6 +23,7 @@ extends Node3D
 const CHAR_SCENE := preload("res://assets/characters/ubc_male/ubc_male.scn")
 const CLIP_LIB := preload("res://assets/animations/ual_clips.res")
 const BodyPoseModifierScript := preload("res://scripts/player/body_pose_modifier.gd")
+const FootIKScript := preload("res://scripts/player/foot_ik_modifier.gd")
 
 # --- clip data (measured on the UBC character, see tools/measure_clips.gd) ---
 const LEN_WALK := 1.3333
@@ -77,6 +78,10 @@ var skeleton: Skeleton3D
 var anim_player: AnimationPlayer
 var anim_tree: AnimationTree
 var pose_mod: SkeletonModifier3D   # body_pose_modifier.gd
+var foot_ik: FootIKModifier        # foot locking / placement (after pose_mod)
+@export var foot_ik_enabled := true
+var _foot_w := 0.0
+var _last_pos := Vector3.ZERO
 var _pc: PlayerController
 var _pb: AnimationNodeStateMachinePlayback
 var _yaw := 0.0
@@ -125,6 +130,12 @@ func _ready() -> void:
 	pose_mod = BodyPoseModifierScript.new()
 	pose_mod.name = "BodyPoseModifier"
 	skeleton.add_child(pose_mod)
+	foot_ik = FootIKScript.new()
+	foot_ik.name = "FootIK"
+	skeleton.add_child(foot_ik)
+	if _pc:
+		foot_ik.collision_mask = _pc.collision_mask
+		foot_ik.exclude = [_pc.get_rid()]
 	_setup_arm_ik()
 	# Modifier results (lean/warp/IK) only exist while the skeleton is being
 	# finalised; snapshot the FINAL pose so tests/debug measure what is drawn.
@@ -367,6 +378,9 @@ func _process(dt: float) -> void:
 func update_presentation(dt: float) -> void:
 	_state_t += dt
 	var st := _pc.get_state_name()
+	if _pc.global_position.distance_to(_last_pos) > 2.0 and foot_ik:
+		foot_ik.reset()   # teleport
+	_last_pos = _pc.global_position
 	var v3 := _pc.velocity
 	var hv := Vector3(v3.x, 0, v3.z)
 	var k := 1.0 - exp(-14.0 * dt)
@@ -581,7 +595,15 @@ func _drive_procedural(dt: float, st: String) -> void:
 		_pitch_s = maxf(_pitch_s, _tr_lean)
 	_bank_s = lerpf(_bank_s, bank_t, 1.0 - exp(-8.0 * dt))
 	# Slope / stair: drop the pelvis a little so the lower foot reaches.
-	var drop_t := clampf(tan(deg_to_rad(p_slope_deg)) * 0.12, 0.0, 0.08) if on_ground else 0.0
+	# (superseded by FootIK's ground-raycast pelvis correction when it is on)
+	var drop_t := clampf(tan(deg_to_rad(p_slope_deg)) * 0.12, 0.0, 0.08) if on_ground and not foot_ik_enabled else 0.0
+	var foot_t := 1.0 if foot_ik_enabled and on_ground and anim_state == "ground" else 0.0
+	_foot_w = lerpf(_foot_w, foot_t, 1.0 - exp(-(10.0 if foot_t > _foot_w else 30.0) * dt))
+	if _foot_w < 0.002 and foot_t == 0.0:
+		_foot_w = 0.0
+	foot_ik.weight = _foot_w
+	foot_ik.dt = dt
+	foot_ik.active = _foot_w > 0.0
 	_drop_s = lerpf(_drop_s, drop_t, 1.0 - exp(-10.0 * dt))
 	pose_mod.pitch = _pitch_s
 	pose_mod.bank = _bank_s
@@ -599,4 +621,5 @@ func get_anim_debug() -> Dictionary:
 		"land_severity": p_land_severity, "land_weight": land_weight,
 		"gait": gait, "run_style": run_style, "cycle_rate": cycle_rate, "warp_deg": rad_to_deg(warp_angle),
 		"bank_deg": rad_to_deg(_bank_s), "pitch_deg": rad_to_deg(_pitch_s),
+		"foot_ik_w": _foot_w, "foot_ik": foot_ik.debug if foot_ik else {},
 	}

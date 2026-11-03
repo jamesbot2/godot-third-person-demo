@@ -905,8 +905,39 @@ func _traverse_contact(top_y: float, z_face: float, z_back: float) -> Dictionary
 	return {"hand": best, "hand_frames": close, "pen": pen}
 
 
+## Per tick while GROUND: sole clearance of the LOWER foot over the real
+## ground under it (down raycasts at ball and ankle). gap<0 = penetration.
+func _terrain_feet(n: int) -> Dictionary:
+	var space := pc.get_world_3d().direct_space_state
+	var gaps: Array = []
+	var pen := 0.0
+	var max_y := 0.0
+	for k in n:
+		await tick()
+		max_y = maxf(max_y, pc.global_position.y)
+		if pc.state != PlayerController.State.GROUND:
+			continue
+		var lo := INF
+		for sd in ["l", "r"]:
+			var foot_gap := INF
+			for spec in [["ball_", 0.024], ["foot_", 0.093]]:
+				var p := _bone_world(spec[0] + sd)
+				var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 0.6, p + Vector3.DOWN * 1.0, pc.collision_mask, [pc.get_rid()])
+				var h := space.intersect_ray(q)
+				if h:
+					var gp: float = p.y - (h["position"] as Vector3).y - spec[1]
+					foot_gap = minf(foot_gap, gp)
+					pen = maxf(pen, -gp)
+			lo = minf(lo, foot_gap)
+		if lo < INF:
+			gaps.append(lo)
+	return {"gaps": gaps, "pen": pen, "max_y": max_y}
+
+
 func t_anim() -> void:
 	_anim = pc.get_node("Model")
+	if OS.has_environment("FOOTIK_OFF"):
+		_anim.foot_ik_enabled = false
 	_sk = _anim.skeleton if _anim else null
 	var tree: AnimationTree = _anim.anim_tree if _anim else null
 	check("anim_setup", _sk != null and _sk.get_bone_count() == 65 and tree != null and tree.active and _anim.anim_player.has_animation("jog"),
@@ -954,6 +985,8 @@ func t_anim() -> void:
 				tpose_ok = false
 		slips.sort()
 		var med := slips[slips.size() / 2] if slips.size() > 0 else -1.0
+		var p90 := slips[int(slips.size() * 0.9)] if slips.size() > 0 else -1.0
+		metric("anim_%s_slip_p90" % spec[0], p90)
 		d = _anim.get_anim_debug()
 		metric("anim_%s_slip_med" % spec[0], med)
 		metric("anim_%s_min_foot_y" % spec[0], min_fy)
@@ -961,11 +994,39 @@ func t_anim() -> void:
 		var fwd_mean := fwd_slip / maxf(slips.size(), 1)
 		# Guard: planted foot speed stays a small fraction of body speed and
 		# has no systematic drift (playback rate matches ground speed).
-		check("anim_%s" % spec[0], d["anim_state"] == "ground" and tpose_ok and slips.size() > 10 and med < 0.25 * spec[1] + 0.2 and absf(fwd_mean) < 0.35 and min_fy > -0.05 and min_fy < 0.05,
-			"v=%.2f gait=%.2f style=%.2f rate=%.2f slip_med=%.2fm/s drift=%.2fm/s n=%d min_foot_y=%.3f" % [pc.get_horizontal_speed(), d["gait"], d["run_style"], d["cycle_rate"], med, fwd_mean, slips.size(), min_fy])
+		# Round 3 (foot locking): planted-foot median slip < 10 % of body speed,
+		# no systematic drift, and the sole never below the floor
+		# (ball joint sits 0.024 m above the sole: min_foot_y >= 0.024 - 0.01).
+		check("anim_%s" % spec[0], d["anim_state"] == "ground" and tpose_ok and slips.size() > 10 and med < 0.1 * spec[1] and absf(fwd_mean) < 0.15 * spec[1] and min_fy > 0.014 and min_fy < 0.06,
+			"v=%.2f gait=%.2f style=%.2f rate=%.2f slip_med=%.3fm/s (%.1f%% of v) p90=%.2fm/s drift=%.2fm/s n=%d min_foot_y=%.3f" % [pc.get_horizontal_speed(), d["gait"], d["run_style"], d["cycle_rate"], med, 100.0 * med / spec[1], p90, fwd_mean, slips.size(), min_fy])
 		release_all()
 		if spec[0] == "walk":
 			press("walk_toggle"); await tick(); release("walk_toggle")
+	# feet on uneven ground: stairs up/down and a 20 deg ramp up/down
+	for spec in [["stairs", Vector3(L.STAIR_X, 0.02, L.STAIR_Z0 + 1.5), 6.5], ["ramp20", Vector3(L.ramp_x(1), 0.02, L.RAMP_Z0 + 1.5), 5.0]]:
+		await place(spec[1])
+		press("move_forward")
+		press("walk_toggle"); await tick(); release("walk_toggle")
+		var g := await _terrain_feet(secs(spec[2] * 0.5))
+		release_all()
+		press("move_back")
+		var g2 := await _terrain_feet(secs(spec[2] * 0.5))
+		release_all()
+		await tick()
+		press("walk_toggle"); await tick(); release("walk_toggle")
+		release_all()
+		var pen := maxf(g["pen"], g2["pen"])
+		var gaps: Array = g["gaps"] + g2["gaps"]
+		gaps.sort()
+		var fmed: float = gaps[gaps.size() / 2] if gaps.size() > 0 else 1.0
+		var fp90: float = gaps[int(gaps.size() * 0.9)] if gaps.size() > 0 else 1.0
+		metric("anim_%s_foot_pen" % spec[0], pen)
+		metric("anim_%s_foot_gap_med" % spec[0], fmed)
+		metric("anim_%s_foot_gap_p90" % spec[0], fp90)
+		# p90 0.07: on stairs the clip stride (~0.65 m/step) spans two 0.30 m treads, so
+		# a released trailing foot briefly hangs ~5-6 cm while it catches up (measured, documented)
+		check("anim_feet_%s" % spec[0], gaps.size() > secs(1.0) and pen < 0.02 and fmed < 0.02 and fp90 < 0.07,
+			"lowest-foot sole gap over ground: median=%.3f m p90=%.3f m  max penetration=%.3f m  n=%d max_y=%.2f" % [fmed, fp90, pen, gaps.size(), maxf(g["max_y"], g2["max_y"])])
 	# jump -> air -> land
 	await place(Vector3(0, 0.02, 4))
 	press("jump"); await tick(); release("jump")

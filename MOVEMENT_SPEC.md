@@ -110,3 +110,16 @@
 - 翻越（VAULT，≤0.9 m 墙）：ClimbUp_1m 的前 0.42 s 按轨迹进度 u seek + ninja_air 收腿混合（u 0.2→0.45）；`_tr_off` 在 u 0.15–0.95 把视觉根部下压使骨盆约贴墙顶 +0.3 m；前倾 38°；双手 IK 目标 = 墙顶前沿内侧 0.12 m、左右 ±0.2 m，权重 u 0.12→0.3 淡入、0.6→0.78 淡出。
 - 攀爬（MANTLE，1.5 m 台）：ClimbUp_1m 全片段按 u seek；视觉根高度 = 起点 + h·smoothstep(0.2, 0.95, u)（比胶囊上升晚，形成“悬挂→引体”）；前倾 28°；u 0.35–0.6 向墙前移 0.2 m（胶囊半径留出的间隙）；双手 IK 目标 = 台沿内侧 0.07 m，权重 u 0.02→0.14 淡入、0.62→0.82 淡出。
 - 注意（Godot 4.7）：`SkeletonModifier3D`（BodyPoseModifier、TwoBoneIK3D）的结果只在骨骼更新内部有效；在别处调用 `get_bone_global_pose` 拿到的是修改器之前的姿态。`CharacterAnimator` 在 `skeleton_updated` 时快照最终姿态，`get_final_bone_world()` 返回渲染用的最终骨骼位置（测试也用它）。
+
+
+### 9.x 脚部锁定 / 落脚 IK（Round 3，`scripts/player/foot_ik_modifier.gd`）
+
+| 参数 | 值 | 说明 |
+|---|---|---|
+| PLANT_H / RELEASE_H | 0.03 / 0.06 m | 动画接触高度 min(球骨−0.0152, 踝骨−0.0865) 的锁定/释放阈值 |
+| max_lock_offset | 0.24 m | 钉住点与动画脚距离超过即释放（进入冷却，抬脚 ≤5 cm 追回）|
+| max_lock_yaw | 0.6 rad | 锁定后身体偏航超过即释放 |
+| max_lock_drop | 0.34 m | 锁定脚比身体低超过即释放（楼梯）|
+| max_pelvis_drop | 0.26 m | 骨盆最大下沉 |
+| 鞋底高度 | 踝 ≥ 地面+0.093，球骨 ≥ 地面+0.024 | 不入地 |
+| 生效 | 仅 GROUND 且动画为 ground | 淡入 10/s，淡出 30/s；物理控制器仍是唯一位移权威，IK 只改骨骼 |
