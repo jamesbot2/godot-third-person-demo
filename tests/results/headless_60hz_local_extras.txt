@@ -1,0 +1,131 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+INFO|anim_library=core+local_extras
+INFO|physics_hz=60 engine=4.7.2-stable (official)
+METRIC|jog_t90_s|0.1833
+RESULT|PASS|accel_jog_t90|t90=0.183s (expect ~0.17)
+METRIC|jog_stop_dist_m|0.3400
+METRIC|jog_stop_time_s|0.1667
+RESULT|PASS|brake_dist_jog|d=0.340 expect=0.339
+METRIC|sprint_t95_s|0.4500
+RESULT|PASS|sprint_buildup|t95=0.450s
+METRIC|sprint_stop_dist_m|0.8900
+RESULT|PASS|brake_dist_sprint|d=0.890
+METRIC|sprint_exit_speed_0.1s|5.6000
+RESULT|PASS|sprint_exit_gradual|v@0.1s=5.60 v@0.5s=4.20
+METRIC|reverse_t90_s|0.3000
+RESULT|PASS|reverse_180|t=0.300s
+METRIC|turn90_t_s|0.1833
+METRIC|turn90_overshoot_m|0.2606
+RESULT|PASS|turn_90|t=0.183s overshoot=0.26m vmax=4.20
+RESULT|PASS|no_instant_turn|max turn rate 885 deg/s
+RESULT|PASS|step_up_0.15|h=0.15 reached=true y_on_top=0.151 max_y=0.151 max_vy=0.00 air_ticks=0 t=0.93s
+RESULT|PASS|step_up_0.25|h=0.25 reached=true y_on_top=0.251 max_y=0.251 max_vy=0.00 air_ticks=0 t=0.93s
+RESULT|PASS|step_up_0.35|h=0.35 reached=true y_on_top=0.351 max_y=0.351 max_vy=0.00 air_ticks=0 t=0.93s
+RESULT|PASS|step_up_0.40|h=0.40 reached=true y_on_top=0.401 max_y=0.401 max_vy=0.00 air_ticks=0 t=0.93s
+RESULT|PASS|step_block_0.50|h=0.50 reached=false y_on_top=0.001 max_y=0.001 max_vy=0.00 air_ticks=0 t=-1.00s
+RESULT|PASS|step_down_0.15|y=0.001 air_ticks=0
+RESULT|PASS|step_down_0.25|y=0.001 air_ticks=0
+RESULT|PASS|step_down_0.35|y=0.001 air_ticks=0
+RESULT|PASS|step_down_0.40|y=0.001 air_ticks=0
+METRIC|stairs_up_time_s|1.0333
+RESULT|PASS|stairs_up_no_jump|t_top=1.03s max_y=1.801 air_ticks=0 jumps=0
+METRIC|stairs_cam_max_dy_per_tick|0.0680
+RESULT|PASS|stairs_camera_smooth|max cam dy/tick=0.0680
+RESULT|PASS|stairs_down_grounded|y=0.001 ungrounded_ticks=0
+RESULT|PASS|steep_stairs_0.25|reached=true y=2.001 t=1.18s max_vy=0.00 air_ticks=0
+RESULT|PASS|ramp_up_10|angle=10 reached=true y=1.501 t=2.88s max_vy=0.00 air_ticks=0
+RESULT|PASS|ramp_down_10|y=0.001 ungrounded_ticks=0
+RESULT|PASS|ramp_up_20|angle=20 reached=true y=1.501 t=1.88s max_vy=0.00 air_ticks=0
+RESULT|PASS|ramp_down_20|y=0.001 ungrounded_ticks=0
+RESULT|PASS|ramp_up_30|angle=30 reached=true y=1.501 t=1.57s max_vy=0.00 air_ticks=0
+RESULT|PASS|ramp_down_30|y=0.001 ungrounded_ticks=0
+RESULT|PASS|ramp_up_40|angle=40 reached=true y=1.501 t=1.42s max_vy=0.00 air_ticks=0
+RESULT|PASS|ramp_down_40|y=0.001 ungrounded_ticks=0
+RESULT|PASS|ramp_reject_50|angle=50 reached=false y=0.000 t=-1.00s max_vy=0.00 air_ticks=0
+METRIC|slope40_drift_m|0.0000
+RESULT|PASS|slope_40_no_drift|drift=0.0000
+METRIC|jump_apex_m|0.8999
+METRIC|jump_airtime_s|0.6833
+RESULT|PASS|jump_full_height|apex=0.900 expect=0.90 airtime=0.683s
+METRIC|jump_tap_apex_m|0.3931
+RESULT|PASS|jump_variable_tap|tap apex=0.393
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
+RESULT|PASS|no_bhop_gain|max h-speed over 6 chained jumps=6.800
+RESULT|PASS|coyote_0.07s|delay=0.07 jumped=true vy=4.33
+RESULT|PASS|coyote_0.20s|delay=0.20 jumped=false vy=-4.65
+RESULT|PASS|jump_buffer|rejumped=true
+METRIC|air_drift_from_rest_m|0.5167
+RESULT|PASS|air_control_limited|lateral drift=0.517m in 0.67s
+RESULT|PASS|air_momentum|fwd speed at take-off=4.20, before landing=3.52
+RESULT|PASS|corridor_1.0|z=-12.65 x_err=0.000 y=0.000
+RESULT|PASS|corridor_0.85|z=-20.27 x_err=0.000 y=0.001
+RESULT|PASS|corridor_wall_slide|max_y=0.001 max|x-c|=0.150 (limit 0.170) progress=3.72m
+RESULT|PASS|wall_no_climb_0|max_y=0.001 min_z_in_front=-5.649 (face z=-6.00 + r=0.35)
+RESULT|PASS|wall_no_climb_30|max_y=0.001 min_z_in_front=-4.940 (face z=-6.00 + r=0.35)
+RESULT|PASS|wall_no_tunnel_30mps|z=-5.647
+RESULT|PASS|tunnel_blocks_standing|z=-5.65
+RESULT|PASS|tunnel_no_stand_inside|z=-9.17 crouched=true h=1.15
+RESULT|PASS|tunnel_crouch_through_and_stand|z=-22.68 crouched=false
+METRIC|slide_time_s|1.0333
+METRIC|slide_dist_m|5.5554
+RESULT|PASS|slide_start|v_sprint=6.80 v_entry=7.72
+RESULT|PASS|slide_ends|time=1.03s dist=5.56m state=GROUND
+RESULT|PASS|slide_cooldown|state=GROUND
+RESULT|PASS|slide_jump_cancel|state=AIR vy=4.33 h=1.80
+RESULT|PASS|slide_into_tunnel_safe|z=-11.01 h=1.15 y=0.001
+METRIC|roll_dist_m|2.8040
+RESULT|PASS|roll|dur=0.600s dist=2.80m end=GROUND
+RESULT|PASS|roll_cooldown|state=GROUND
+RESULT|PASS|roll_from_idle|state=ROLL
+RESULT|PASS|vault_0.9|saw=true z=-9.77 y=0.001 max_y=0.96 state=GROUND
+RESULT|PASS|vault_sprint|v_in=6.80 saw=true z=-9.81 max_y=0.96
+RESULT|PASS|vault_needs_input|z=-5.60 state=GROUND
+RESULT|PASS|mantle_1.5|saw=true y=1.501 max_y=1.560 state=GROUND
+RESULT|PASS|mantle_air_catch|saw=true y=1.501 state=GROUND
+RESULT|PASS|tall_wall_rejected|traversed=false y=0.001
+RESULT|PASS|landing_2m|impact=8.55 m/s severity=1 expect=1
+RESULT|PASS|landing_4m|impact=12.15 m/s severity=2 expect=2
+RESULT|PASS|landing_roll|rolled=true recovery=0.00
+RESULT|PASS|crate_push_light|crate moved=3.40m player max_y=0.001 max_vy=0.00
+RESULT|PASS|crate_heavy_resists|heavy moved=0.00m
+RESULT|PASS|camera_never_inside_geometry|inside=0 / 600 samples
+RESULT|PASS|camera_idle_stable|max drift=0.00001
+RESULT|PASS|fuzz_no_nan|
+RESULT|PASS|fuzz_no_launch|max vy=4.54 []
+RESULT|PASS|fuzz_no_fall_through|min y=0.000
+RESULT|PASS|fuzz_no_stuck_action_state|longest SLIDE/ROLL/TRAVERSE run=0.58s
+RESULT|PASS|anim_setup|bones=65 active=true
+METRIC|anim_idle_foot_y|0.0229
+RESULT|PASS|anim_idle|state=ground node=ground foot_y=0.023 tpose=false
+METRIC|anim_walk_slip_p90|0.0000
+METRIC|anim_walk_slip_med|0.0000
+METRIC|anim_walk_min_foot_y|0.0231
+METRIC|anim_walk_slip_drift|0.0000
+RESULT|PASS|anim_walk|v=1.80 gait=0.20 style=0.00 rate=0.97 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=52 min_foot_y=0.023
+METRIC|anim_jog_slip_p90|0.0000
+METRIC|anim_jog_slip_med|0.0000
+METRIC|anim_jog_min_foot_y|0.0231
+METRIC|anim_jog_slip_drift|0.0000
+RESULT|PASS|anim_jog|v=4.20 gait=0.47 style=0.00 rate=1.30 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.00m/s n=33 min_foot_y=0.023
+METRIC|anim_sprint_slip_p90|0.0000
+METRIC|anim_sprint_slip_med|0.0000
+METRIC|anim_sprint_min_foot_y|0.0231
+METRIC|anim_sprint_slip_drift|0.0216
+RESULT|PASS|anim_sprint|v=6.80 gait=0.77 style=1.00 rate=1.47 slip_med=0.000m/s (0.0% of v) p90=0.00m/s drift=0.02m/s n=19 min_foot_y=0.023
+METRIC|anim_stairs_foot_pen|0.0000
+METRIC|anim_stairs_foot_gap_med|0.0000
+METRIC|anim_stairs_foot_gap_p90|0.0692
+RESULT|PASS|anim_feet_stairs|lowest-foot sole gap over ground: median=0.000 m p90=0.069 m  max penetration=0.000 m  n=390 max_y=1.80
+METRIC|anim_ramp20_foot_pen|0.0004
+METRIC|anim_ramp20_foot_gap_med|0.0066
+METRIC|anim_ramp20_foot_gap_p90|0.0518
+RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.007 m p90=0.052 m  max penetration=0.000 m  n=300 max_y=1.01
+RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.41
+RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
+RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.12
+RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.023 m  planted wrist err=0.000 m  hand penetration=0.003 m  max sole penetration=0.000 m
+RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=26 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.005 m
+RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
+SUMMARY|hz=60|pass=86|fail=0

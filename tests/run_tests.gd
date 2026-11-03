@@ -93,6 +93,9 @@ func metric(name: String, v: float) -> void:
 	print("METRIC|%s|%.4f" % [name, v])
 
 
+const EXPECTED_TOTAL := 86
+
+
 func want(name: String) -> bool:
 	return only == "" or name.begins_with(only)
 
@@ -109,6 +112,11 @@ func _run() -> void:
 		if want(t):
 			await call(t)
 	release_all()
+	# guard: a script parse error silently skips whole test groups (they then
+	# report nothing) -- a full run must report exactly EXPECTED_TOTAL results
+	if only == "" and passes + fails != EXPECTED_TOTAL:
+		print("RESULT|FAIL|runner_total|expected %d results, got %d (script error?)" % [EXPECTED_TOTAL, passes + fails])
+		fails += 1
 	print("SUMMARY|hz=%d|pass=%d|fail=%d" % [hz, passes, fails])
 	quit(0 if fails == 0 else 1)
 

@@ -126,7 +126,9 @@
 
 ### 9.y 翻越 / 攀爬：真实片段 + 接触驱动视觉根（Round 3，`character_animator.gd::_drive_traverse_contact`）
 
-片段：Quaternius UAL2 “Source” 级 CC0 片段（经 Drawcall Market 免费获取，见 THIRD_PARTY），`tools/retarget_drawcall.gd` 重定向到 UE 65 骨：
+> **2026-11-03 更新**：这些片段许可证存疑（见 THIRD_PARTY），只在本机 extras 模式可用；仓库默认的 core 模式见 §9.z。
+
+片段（仅 extras 模式）：Quaternius UAL1 Pro / UAL2 Source 级付费内容，经第三方 Drawcall Market 转发，`tools/retarget_drawcall.gd` 重定向到 UE 65 骨：
 翻越 = `vault_safety`（safety-vault），攀爬 = `climb_up_2m`（从 MANTLE_T0 = 0.24 s 起播，跳过 2 m 版本的下蹲起跳）。
 片段没有根骨，位移只在盆骨轨道里；**控制器仍是唯一位移权威**，下面的一切只移动 `character.position`（视觉偏移）和骨骼。
 
@@ -149,3 +151,17 @@
 `TwoBoneIK3D` 用 `skeleton.get_global_transform_interpolated()` 把目标变到骨架空间 → 目标错位，误差随视觉偏移的帧间变化而变，**这就是攀爬手部接触随物理频率变化的原因**。
 修复：`render_xf(n) = 胶囊插值变换 × (胶囊⁻¹ × n.global_transform)`（胶囊只在物理帧移动，第 1 遍缓存是新的）；脚部 IK 与最终姿态快照用 `render_xf`；
 手部 IK 目标经由骨架下的**隐藏**子节点喂入（隐藏节点按需计算 = 最近可见祖先的缓存 × 当前局部），IK 看到的骨架空间目标与我们算的完全一致。
+
+
+### 9.z 翻越 / 攀爬：core 模式（仅 CC0 Standard 片段，`_drive_traverse_core` / `_plan_core_lift` / `_core_traverse_post`）
+
+- 姿态：攀爬 = `ClimbUp_1m` 循环按 u 播放；翻越 = 前段 `ClimbUp_1m` 与 `NinjaJump_Idle` 收腿姿态按 smoothstep(0.2, 0.45, u) 混合。
+- 控制器轨迹对 u 是确定的，`_core_cap_at(u)` 复现它。进入 TRAVERSE 时 `_plan_core_lift` 对 u 采样 96 点，生成视觉根偏移表：
+  1. 基础偏移 = 时间表（攀爬：起点高度 + h·smoothstep(0.12,0.72,u)；翻越：越墙时把高出的胶囊压回）；
+  2. 撑手窗口内把偏移钳到“肩到撑点距离 ≤ 0.93·臂长”的范围（撑点：左右 ±0.2 m，前沿内 0.07/0.12 m，顶面 + 0.03）；
+  3. ±0.1u 滑动平均；
+  4. 预测哪只鞋底在台面范围内，要求其 ≥ 顶面 + 0.02，提前 0.2u 抬起、保持 0.1u。
+- 后处理（每帧）：剩余够不到量按撑手权重修正；鞋底抬升取各脚最大值（不累加）；手 IK 在整个 TRAVERSE 中权重恒为 1，
+  “FK 手 → 撑点”的混合放在 IK 目标里（有效权重 = 时间表 × 软可达性，按 6.5/s 限速），目标钳出障碍体。
+  `hand_contact` 只在有效权重 > 0.99、可达、目标在撑点上时为真。
+- 攀爬撑手窗口：smoothstep(0.02,0.2,u) × (1 − smoothstep(0.5,0.88,u))；翻越：smoothstep(0.12,0.3) × (1 − smoothstep(0.6,0.78))。

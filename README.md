@@ -56,7 +56,11 @@ done
 # 输出：RESULT|PASS/FAIL|名称|细节 、METRIC|名称|值 、SUMMARY|hz|pass|fail
 ```
 
-当前结果（见 `tests/results/`）：30 Hz 84/84、60 Hz 84/84、120 Hz 84/84（含 11 项动画测试）。
+当前结果（见 `tests/results/`）：30/60/120 Hz 均 86/86（core 模式，仓库默认）；本机 extras 模式也是 86/86（`headless_*hz_local_extras.txt`）。
+
+动画模式：仓库只含 CC0 Standard 片段（core 模式，翻越/攀爬为程序化拼接）。真实翻越/攀爬/转身片段来自第三方 Drawcall Market 转发的
+Quaternius 付费级内容，许可证**存疑**，不提交；可在本机运行 `tools/fetch_drawcall.sh` + `tools/retarget_drawcall.gd --build`
+生成 git 忽略的 `assets/animations/local/ual_extra.res`（extras 模式）。`UAL_EXTRAS=0` 强制 core 模式。详见 THIRD_PARTY.md。
 
 ```bash
 # 可视化展示（必须非 headless，需要 X 显示；录制 avi，再用 ffmpeg 转 mp4）
@@ -81,7 +85,8 @@ scripts/player/step_solver.gd         上台阶扫掠求解
 scripts/player/character_animator.gd  骨骼角色：AnimationTree 状态机、步幅匹配、seek 动作、手部 IK、姿态修改器
 scripts/player/graybox_body.gd        旧灰盒人形（不再使用）
 assets/characters/ubc_male/           UBC 男性角色（CC0，构建产物）
-assets/animations/ual_clips.res       UAL1/2 动画片段（CC0，构建产物，根运动已去除）
+assets/animations/ual_clips.res       UAL1/2 Standard 动画片段（CC0，构建产物，根运动已去除）
+assets/animations/local/              （git 忽略）本机可选 extras 片段库
 assets/licenses/                      原始许可证文本
 tools/build_character_assets.gd       资源构建（glTF→.scn/.res，重定向、去根运动、纹理）
 tools/fetch_quaternius.sh             从 itch.io 免登录下载 $0 包
@@ -89,6 +94,6 @@ scripts/camera/camera_rig.gd          第三人称相机架
 scripts/level/course_layout.gd        测试场尺寸常量（测试与关卡共用）
 scripts/level/graybox_course.gd       测试场生成
 scripts/hud.gd                        HUD
-tests/run_tests.gd                    自动化测试（84 项）
+tests/run_tests.gd                    自动化测试（86 项）
 tools/showcase.gd                     可视化自动驾驶展示 + 截图
 ```

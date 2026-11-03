@@ -74,12 +74,27 @@
 - 手：伸手路径先升后入（不扫过台沿角，0.09 → 0）；超出臂长时手权重淡出（不再满权重悬空 4–7 cm）。
 - 测试收紧（见 TEST_REPORT），86/86 @30/60/120 Hz。
 
+## Cycle 8 — Round 3：许可证核查与 core/extras 拆分
+
+- 核查 Drawcall 片段：zip README 显示一部分是 UAL1 **Pro**、一部分是 UAL2 **Source**（旧文档全记成 UAL2，错误）；都是付费级，
+  由身份不明的第三方免费转发；Quaternius 2026-08-28 起的新许可证 QAL v1.0 禁止再分发资源本身。结论“存疑” → 不提交（THIRD_PARTY.md）。
+- `ual_clips.res` 恢复为 Standard-only（= c9e8228）；extras 片段改为本机可选、git 忽略的 `assets/animations/local/ual_extra.res`。
+- core 模式翻越/攀爬重写为“预先规划的视觉根偏移表 + IK 目标内混合”，消除 0.6 m/帧的跳变（剩余最大约 0.16 m/帧 @120 Hz）。
+- 测试运行器自检：完整运行必须恰好 86 条结果。日志打印 `INFO|anim_library=…`。
+- core 与 extras 两种模式均 86/86 @30/60/120 Hz。
+- **未处理**：已推送的 `9e0060c` 中的 `ual_clips.res` 含存疑片段的烘焙数据；改写历史需仓库所有者确认。
+
 ## 可恢复状态（2026-11-03）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并**）。所有代码已推送；测试 86/86 @30/60/120 Hz（`tests/results/`）。
-- Round 3 进度：优先级 1（脚部 IK）、2（翻越/攀爬接触）已完成；接下来 3 起停/转身/侧移（片段已烘焙：jog/walk_left/right/bwd、turn90_l/r、turn180_l/r，尚未接入）、4 翻滚入口。
-- 重新录制：见 README“测试”一节（DISPLAY=:17，llvmpipe）。联系表脚本在运行机 `/workspace/eval/sheet.py`（不在仓库中）。
-- 未验收（需 M2 真机）：所有动态观感，尤其是转身/侧移/后退、楼梯/坡道、翻越手部接触、攀爬。
+- 分支 `dev/movement-system`，PR #1（**不要合并**）。测试 86/86 @30/60/120 Hz，core 与 extras 两种模式（`tests/results/`）。
+- 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`，不在仓库中）；或
+  `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz>`；`UAL_EXTRAS=0` 强制 core。
+- 调试翻越/攀爬：`TRACE_TRAVERSE=1` 打印 PLAN/TR 行；`/workspace/eval/jumps.py <log> 0.07` 统计单帧跳变。
+- Round 3 进度：优先级 1（脚部 IK）、2（翻越/攀爬接触）完成；许可证拆分完成。
+  优先级 3（起停/转身/侧移）：core 模式没有专门片段（Standard 包里没有 strafe/turn），只能程序化；
+  extras 片段已烘焙但未接入（存疑，接入也只在本机生效）。上一次未提交的 extras 方向混合尝试在 git stash `wip-aimed-directional-backup`
+  与运行机 `/workspace/backup_r3/wip_aimed_directional.patch`。优先级 4 翻滚入口未开始。
+- 未验收（需 M2 真机）：所有动态观感。
 
 ## 下一步优先级
 

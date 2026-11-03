@@ -1,7 +1,13 @@
 extends SceneTree
-## Retarget CC0 Quaternius clips redistributed by Drawcall Market (normalized
+## Retarget Quaternius clips redistributed by Drawcall Market (normalized
 ## VRM-style humanoid node hierarchy, no skin) onto the UAL/UBC 65-bone UE
-## skeleton. Offline build step; outputs are committed.
+## skeleton. Offline, OPTIONAL, LOCAL-ONLY build step.
+##
+## LICENSE: these clips come from Quaternius' PAID tiers (UAL1 Pro / UAL2
+## Source) re-uploaded to a third-party marketplace by an unknown uploader;
+## redistribution rights are doubtful (see THIRD_PARTY.md). The output,
+## res://assets/animations/local/ual_extra.res, is git-ignored and is NEVER
+## committed. The game runs without it (core mode, Standard CC0 clips only).
 ##
 ##   godot --headless --path . -s res://tools/retarget_drawcall.gd -- --src=/workspace/assets_raw [--calibrate]
 ##
@@ -48,6 +54,7 @@ const CLIPS := {
 	"turn180_r": ["turn180-r-rm", false],
 }
 const FPS := 60.0
+const EXTRA_DIR := "res://assets/animations/local/"
 const UBC_REL := "ubc/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf"
 const UAL1_REL := "ual1/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb"
 const DC := "drawcall/"
@@ -214,8 +221,9 @@ func _calibrate() -> void:
 		print("%s offset spread %.2f deg" % [k, mx])
 
 
-## Bake every CLIPS entry into res://assets/animations/ual_clips.res (added to
-## the library written by build_character_assets.gd; run that first).
+## Bake every CLIPS entry into the local, git-ignored extras library
+## res://assets/animations/local/ual_extra.res (only these clips; the core
+## library written by build_character_assets.gd is not touched).
 ## Output is in the same convention as the rest of the library: local bone
 ## rotations on the UAL/UE rest + pelvis position scaled by k. These clips have
 ## no root bone (Drawcall's normalized export drops it), i.e. they are
@@ -226,7 +234,8 @@ func _build() -> void:
 	var ubc := _load(src + UBC_REL)
 	var csk: Skeleton3D = ubc.find_children("*", "Skeleton3D", true, false)[0]
 	var k := csk.get_bone_rest(csk.find_bone("pelvis")).origin.z / sk.get_bone_rest(sk.find_bone("pelvis")).origin.z
-	var lib: AnimationLibrary = load("res://assets/animations/ual_clips.res")
+	var core: AnimationLibrary = load("res://assets/animations/ual_clips.res")
+	var lib := AnimationLibrary.new()
 	var root_g := sk.get_bone_rest(sk.find_bone("root"))
 	var inv_map := {}
 	for kk in MAP:
@@ -268,13 +277,12 @@ func _build() -> void:
 				out.track_insert_key(tr[bn], time, (pq.inverse() * gq[bn]).normalized())
 			out.track_insert_key(pt, time, (root_g.affine_inverse() * gs["hips"].origin) * k)
 		if our == "_check_jog":
-			_compare(out, lib.get_animation("jog"))
+			_compare(out, core.get_animation("jog"))
 			continue
-		if lib.has_animation(our):
-			lib.remove_animation(our)
 		lib.add_animation(our, out)
 		print("baked ", our, " <- ", spec[0], " len=", snappedf(da.length, 0.01), " keys/track=", n + 1)
-	var err := ResourceSaver.save(lib, "res://assets/animations/ual_clips.res", ResourceSaver.FLAG_COMPRESS)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(EXTRA_DIR))
+	var err := ResourceSaver.save(lib, EXTRA_DIR + "ual_extra.res", ResourceSaver.FLAG_COMPRESS)
 	print("saved library: ", err, " k=", k)
 
 

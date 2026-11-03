@@ -1,5 +1,6 @@
 Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 
+INFO|anim_library=core (CC0 Standard clips only)
 INFO|physics_hz=60 engine=4.7.2-stable (official)
 METRIC|jog_t90_s|0.1833
 RESULT|PASS|accel_jog_t90|t90=0.183s (expect ~0.17)
@@ -53,6 +54,8 @@ RESULT|PASS|no_bhop_gain|max h-speed over 6 chained jumps=6.800
 RESULT|PASS|coyote_0.07s|delay=0.07 jumped=true vy=4.33
 RESULT|PASS|coyote_0.20s|delay=0.20 jumped=false vy=-4.65
 RESULT|PASS|jump_buffer|rejumped=true
+WARNING: Jolt Physics job system exceeded the maximum number of jobs. This should not happen. Please report this. Waiting for jobs to become available...
+     at: CreateJob (modules/jolt_physics/spaces/jolt_job_system.cpp:123)
 METRIC|air_drift_from_rest_m|0.5167
 RESULT|PASS|air_control_limited|lateral drift=0.517m in 0.67s
 RESULT|PASS|air_momentum|fwd speed at take-off=4.20, before landing=3.52
@@ -122,7 +125,7 @@ RESULT|PASS|anim_feet_ramp20|lowest-foot sole gap over ground: median=0.007 m p9
 RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.41
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.05
 RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.12
-RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.023 m  planted wrist err=0.000 m  hand penetration=0.003 m  max sole penetration=0.000 m
-RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=26 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.005 m
+RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.030 m  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
+RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=19 (0.32 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.006 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
 SUMMARY|hz=60|pass=86|fail=0

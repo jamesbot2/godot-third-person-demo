@@ -13,3 +13,6 @@ Godot_v*
 .DS_Store
 Thumbs.db
 *.tmp
+
+# Optional local-only clips of doubtful redistribution status (THIRD_PARTY.md)
+assets/animations/local/

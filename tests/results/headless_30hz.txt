@@ -1,5 +1,6 @@
 Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 
+INFO|anim_library=core (CC0 Standard clips only)
 INFO|physics_hz=30 engine=4.7.2-stable (official)
 METRIC|jog_t90_s|0.2000
 RESULT|PASS|accel_jog_t90|t90=0.200s (expect ~0.17)
@@ -123,6 +124,6 @@ RESULT|PASS|anim_jump_air_land|jump=true air=true ground=true land_w=0.40
 RESULT|PASS|anim_slide|slide=true pelvis_h=0.06
 RESULT|PASS|anim_roll|roll=true model_tilt=0.000 min_head_h=0.13
 RESULT|PASS|anim_vault_contact|closest hand-to-wall-top=0.030 m  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
-RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=13 (0.43 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
+RESULT|PASS|anim_mantle_contact|closest hand-to-ledge=0.030 m  frames within 8 cm=12 (0.40 s)  planted wrist err=0.000 m  hand penetration=0.000 m  max sole penetration=0.000 m
 RESULT|PASS|anim_traverse_states|vault=true mantle=true end=ground
 SUMMARY|hz=30|pass=86|fail=0

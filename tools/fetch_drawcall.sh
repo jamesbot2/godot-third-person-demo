@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Download the CC0 Quaternius UAL2 "Source" clips redistributed (free, no
-# login) by Drawcall Market. Raw zips are NOT committed; the retargeted
-# result is assets/animations/ual_clips.res (tools/retarget_drawcall.gd).
+# OPTIONAL, LOCAL ONLY. Download Quaternius paid-tier clips (UAL1 Pro / UAL2
+# Source) that a third party re-uploaded (free, no login) to Drawcall Market.
+# Their redistribution status is DOUBTFUL (see THIRD_PARTY.md): neither the
+# zips nor anything baked from them is committed. The retargeted result goes
+# to the git-ignored assets/animations/local/ual_extra.res
+# (tools/retarget_drawcall.gd --build). Check the licence yourself first.
 #   tools/fetch_drawcall.sh [/workspace/assets_raw]
 set -euo pipefail
 DST="${1:-/workspace/assets_raw}/drawcall"

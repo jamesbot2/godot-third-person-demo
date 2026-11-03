@@ -37,16 +37,29 @@
 
 已知资源缺口（CC0 Standard 包中没有，靠程序化补偿，见 MOVEMENT_SPEC §9）：专门的起步/停步/原地转身/侧移片段、真正的翻越（vault）片段、真正的攀上台沿（mantle）片段。翻越/攀爬是用 `ClimbUp_1m`（爬坡循环）+ `NinjaJump_Idle` 收腿姿态 + 手部 IK + 视觉根偏移拼出来的。
 
-## 美术资源（Round 3 新增：翻越/攀爬/转身/侧移片段）
+## Round 3：Drawcall Market 片段的许可证核查（2026-11-03，结论：**存疑 → 不提交**）
 
-| 资源 | 来源 URL | 许可证 | 仓库中的形式 |
-|---|---|---|---|
-| Quaternius Universal Animation Library 2 “Source” 级单片段（经 Drawcall Market 再分发）：safety-vault-root-motion、climb-ledge、climb-up-2m-root-motion、jog-fwd-loop（仅用于重定向标定）、jog-left/right/bwd-loop、walk-l/right/bwd-loop、turn90-l、turn90-right、turn180-left-root-motion-alternate-2、turn180-r-rm | 每个片段页 `https://market.drawcall.ai/asset/<slug>`，下载 `https://market.drawcallcontent.com/zips/<slug>@<版本>.zip`（版本见 `tools/fetch_drawcall.sh`）；原作者 https://quaternius.com/packs/universalanimationlibrary2.html | CC0 1.0（片段页与 zip 内 README 均写明 “CC0”；记录见 `assets/licenses/Quaternius_UAL2_Source_via_Drawcall.txt`）| 重定向后写入 `assets/animations/ual_clips.res` |
+Round 3 前期（提交 `9e0060c`）把 Drawcall Market（https://market.drawcall.ai）上的 14 个 Quaternius 单片段
+重定向后烘焙进了 `assets/animations/ual_clips.res`，并把它们记为“UAL2 Source，CC0”。本轮重新核查后的结论：
 
-- **如实说明**：这些片段在 quaternius.com 属于 UAL2 的**付费 “Source” 级**。Drawcall Market 免登录、免费提供单片段下载并标注 CC0；我们没有付费。
-  CC0 允许再分发，与原始销售渠道无关；仍署名 Quaternius。若用户对来源有顾虑，可删除这些片段回退到 Round 2 的 Standard 片段（代码需相应回退）。
-- 获取：`tools/fetch_drawcall.sh`（curl，无需浏览器/登录），带 sha256 前缀校验。原始 zip/glb 未提交。
-- 重定向：`tools/retarget_drawcall.gd`。Drawcall 片段是去掉蒙皮的规范化人形层级（无根骨）；同一 Quaternius 源骨架只做了旋转重定基，
-  因此每根骨有常量局部偏移 O_b，用两种形式都有的 Jog_Fwd（UAL1 原生 vs jog-fwd-loop）测出并核对其恒定性，再应用到其它片段。
-  片段本身无根骨 → 没有可剥离的根运动；位移只在盆骨轨道，表现层按接触点放视觉根（MOVEMENT_SPEC §9.y），控制器仍是唯一位移权威。
-- 已知资源缺口更新：翻越、攀上台沿已使用真实片段；原地转身、侧移/后退片段已烘焙进 `ual_clips.res`（是否接入见 ITERATION_LOG）；起步/停步专用片段仍没有。
+| 核查项 | 发现（来源） |
+|---|---|
+| 片段归属 | zip 内 README 自述：safety-vault-root-motion、climb-up-2m-root-motion、turn180-*、walk-l/right/bwd-loop 为 “Universal Animation Library **2 Source**”；climb-ledge、jog-fwd/left/right/bwd-loop、turn90-l/right 为 “Universal Animation Library **Pro**”（UAL1）。旧文档把它们全记成 “UAL2 Source”，**记错了**。 |
+| 在作者处的级别 | 都不在免费的 Standard 包里，属于付费级（itch.io 上 UAL1 `[Source].zip` 需付 $14.99 以上；UAL2 同理）。 |
+| 作者声明的许可证 | itch.io 包页面写 “Free to use … (CC0 License)”，Asset license 栏为 CC0 1.0（https://quaternius.itch.io/universal-animation-library 、…/universal-animation-library-2，2026-11-03 查看）。 |
+| 作者的新许可证 | Quaternius Asset License (QAL) v1.0（https://quaternius.com/license.html ，最后更新 2026-08-28）**禁止把资源本身（含修改后）作为资源再分发**，并称“无论从哪个站点/平台获得”均适用；第 7 条称只适用于此后发布的资源、不溯及既往。UAL1 v3.0（2026-06-16）、UAL2 v2.2（2026-09-28）都在更新。 |
+| 再分发者 | Drawcall Market 是与作者无明确关系的第三方，免登录免费提供付费级单片段并标注 CC0；无法核实其获得的是哪个版本、在哪个许可证下发布。 |
+
+**结论：存疑（doubtful）。** 作者的包页面写 CC0，按 CC0 这些片段本可再分发；但它们是付费级内容，经身份不明的第三方
+免费转发，版本与 QAL 生效日期的先后关系无法核实，旧文档对来源的记录也有误。按任务规则“存疑就不提交原始文件，只保留获取脚本”：
+
+- `assets/animations/ual_clips.res` 已恢复为只含 CC0 **Standard** 片段的版本（与 `c9e8228` 相同）。
+- 本机可选：`tools/fetch_drawcall.sh` 下载 → `tools/retarget_drawcall.gd --build` 写入 **git 忽略** 的
+  `assets/animations/local/ual_extra.res`。存在该文件时动画器自动启用 “extras” 模式（真实翻越/攀上台沿片段），否则用
+  “core” 模式（只用 Standard 片段，程序化翻越/攀爬）。`UAL_EXTRAS=0` 强制 core 模式。两种模式都跑满 86 个测试。
+- 删除了 `assets/licenses/Quaternius_UAL2_Source_via_Drawcall.txt`（它把片段错误地描述为全部 UAL2、并断言可再分发）。
+- **未处理的历史问题**：已推送的提交 `9e0060c` 中的 `ual_clips.res` 仍包含这些片段的烘焙数据。改写已推送的历史（force-push）
+  需要仓库所有者确认，本轮没有做。若需要彻底移除，可在确认后对 `dev/movement-system` 做历史改写，或在合并前 squash。
+- 如需正式使用这些片段：直接向 Quaternius 购买 Source/Pro 包，并按购买时附带的许可证决定能否把烘焙结果放进公开仓库。
+
+Standard 包（UBC、UAL1 Standard、UAL2 Standard）的结论不变：CC0，直接从作者的 itch.io 页面以 $0 获得。
