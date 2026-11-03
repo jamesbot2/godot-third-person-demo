@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_pc"]
-[ext_resource type="Script" path="res://scripts/player/graybox_body.gd" id="2_body"]
+[ext_resource type="Script" path="res://scripts/player/character_animator.gd" id="2_body"]
 [ext_resource type="Script" path="res://scripts/camera/camera_rig.gd" id="3_cam"]
 
 [sub_resource type="CylinderShape3D" id="Cyl_1"]
