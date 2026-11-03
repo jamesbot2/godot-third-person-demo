@@ -91,18 +91,28 @@
 - 起停断开 2–5 次 → 0；侧移/后退/斜后 pops 1–3 → 0；楼梯 120 Hz p90 0.073 → 0.047；extras 攀爬鞋底穿入 0.030 → 0。
 - 试过但撤回：起步 1/_move_s 循环加速（断开更多）；swing_min_offset 0.06/0.14（冲刺滑移中位数 0.36–0.89）。
 
-## 可恢复状态（2026-11-03）
+## Cycle 10 — Round 3：原地转身、翻滚入口、第 3 轮可视化验收（3c1fb94, 2337812, dfbb5bd）
 
-- 分支 `dev/movement-system`，PR #1（**不要合并**）。测试 94/94 @30/60/120 Hz，core 与 extras 两种模式（`tests/results/`）。
+- 原地转身：站定时偏航超限走 settle 小步而非断锁；新测试 2 项 → 96 项。基线 180° 在 30/120 Hz 各断 1 次，现 0。
+- 翻滚入口：从片段 0.12 s 进入 + 0.10 s 淡化 + 最低接触点下压表；俯冲腾空 0.27–0.31 → ~0.13 m，身体系头速 52 → ≤19 m/s。
+  试过：T0 0.36/0.06 淡化（33.6 m/s）、0.20/0.10（17.1）、0.05/0.08（15.8，但入口更突兀）。
+- ClipSampler 骨骼名断言（发现 `"head"` 静默读错骨骼）。
+- 第 3 轮可视化（core）：showcase 加原地转身段 + 28 张特写（SubViewport，不打断视频）。结论见 TEST_REPORT 末节。
+
+## 可恢复状态（2026-11-03，Cycle 10 之后）
+
+- 分支 `dev/movement-system`，PR #1（**不要合并、不要强推**）。测试 96/96 @30/60/120 Hz，core 与 extras 两种模式（`tests/results/`）。
 - 跑测试：`runall.sh <tag> [ENV=val]`（运行机 `/workspace/eval/`，不在仓库中）；或
-  `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz>`；`UAL_EXTRAS=0` 强制 core。
-- 调试翻越/攀爬：`TRACE_TRAVERSE=1` 打印 PLAN/TR 行；`/workspace/eval/jumps.py <log> 0.07` 统计单帧跳变。
-- Round 3 进度：优先级 1（脚部 IK）、2（翻越/攀爬接触）完成；许可证拆分完成；优先级 3 的起停/侧移/后退/斜向完成（Cycle 9）。
-  剩余：原地 90°/180° 转身（plant-and-turn）、优先级 4 翻滚入口。
-  优先级 3（起停/转身/侧移）：core 模式没有专门片段（Standard 包里没有 strafe/turn），只能程序化；
-  extras 片段已烘焙但未接入（存疑，接入也只在本机生效）。上一次未提交的 extras 方向混合尝试在 git stash `wip-aimed-directional-backup`
-  与运行机 `/workspace/backup_r3/wip_aimed_directional.patch`。优先级 4 翻滚入口未开始。
+  `godot --headless --fixed-fps <hz> --path . -s res://tests/run_tests.gd -- --hz=<hz> [--only=t_anim]`；`UAL_EXTRAS=0` 强制 core。
+- 调试：`TRACE_TRAVERSE=1`（翻越/攀爬 PLAN/TR 行）、`ROLL_DEBUG=1`（翻滚下压表/头速）、`ROLLPROBE=1`（测试内翻滚逐帧骨骼）；`/workspace/eval/jumps.py <log> 0.07`。
+- 可视化：`tools/showcase.gd`（默认输出 `/workspace/acceptance/round3`，`--only=roll,vault` 只跑某几段）；`closeup()` 用第二个相机出特写；
+  联系表 `/workspace/eval/sheet.py <dir> <out.png> [cols] [width]`。第 3 轮产物在 `/workspace/acceptance/round3/`。
+- Round 3 进度：优先级 1–3 完成（3 为程序化），原地转身完成；优先级 4 翻滚入口改善但未达标（第一阶段仍是鱼跃）。
+- 剩余问题：翻滚第一阶段鱼跃（骨盆最高 0.7–0.9 m；下一步可试：入口时把片段根前倾/骨盆高度按表钳制，或程序化前 0.15 s 下蹲过渡）；
+  180° 急转双腿交叉；core 侧移无交叉步；翻越/攀爬 core 单帧跳变约 0.16 m/帧；推箱子 120 Hz 差 ~30%；楼梯下行脚部特写缺失（showcase 拍摄时机）；
+  extras 方向混合尝试在 git stash `wip-aimed-directional-backup` 与 `/workspace/backup_r3/wip_aimed_directional.patch`。
 - 未验收（需 M2 真机）：所有动态观感。
+- **未处理**：已推送的 `9e0060c` 中的 `ual_clips.res` 含存疑片段的烘焙数据；改写历史需仓库所有者确认。
 
 ## 下一步优先级
 

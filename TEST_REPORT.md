@@ -9,12 +9,12 @@
 ## 汇总
 
 ```
-SUMMARY|hz=30|pass=94|fail=0
-SUMMARY|hz=60|pass=94|fail=0
-SUMMARY|hz=120|pass=94|fail=0
+SUMMARY|hz=30|pass=96|fail=0
+SUMMARY|hz=60|pass=96|fail=0
+SUMMARY|hz=120|pass=96|fail=0
 ```
 
-（原 86 项全部保留并通过；Round 3 第 2 里程碑新增 8 项，见文末。）
+（原 86 项全部保留并通过；Round 3 第 2 里程碑新增 8 项、原地转身新增 2 项，见文末；`anim_roll` 判据收紧。）
 
 ## 关键指标（三种物理频率）
 
@@ -148,7 +148,7 @@ SUMMARY|hz=120|pass=94|fail=0
 | anim_sprint (6.8 m/s) | PASS 1.02 | PASS 0.90 | PASS 1.12 | 同上 |
 | anim_jump_air_land | PASS | PASS | PASS | jump→air→ground 依次出现，落地权重 >0 |
 | anim_slide | PASS | PASS | PASS | 进入 slide 状态，骨盆贴近地面 |
-| anim_roll | PASS | PASS | PASS | 模型整体倾斜 = 0（不是机械旋转），头部最低 <0.9 m |
+| anim_roll | PASS | PASS | PASS | 模型整体倾斜 = 0；Round 3 收紧：头部最低 0–0.9 m、俯冲腾空 <0.2 m、身体系头速 <25 m/s（见文末） |
 | anim_vault_contact（新）| PASS hand 0.095 m / pen 0 | PASS 0.087 / 0 | PASS 0.086 / 0.009 | 手到墙顶最近 <0.12 m，脚穿入墙体 <0.04 m |
 | anim_mantle_contact（新）| PASS hand 0.045 m, 6 帧 / pen 0.035 | PASS 0.015, 11 帧 / 0.034 | PASS 0.007, 38 帧 / 0.035 | 手到台沿 <0.08 m 且持续 ≥0.15 s，脚穿入 <0.04 m |
 | anim_traverse_states | PASS | PASS | PASS | vault/mantle 状态映射正确，结束回 ground |
@@ -305,3 +305,55 @@ core 模式的“跳变”（如实）：用 `TRACE_TRAVERSE=1` 逐帧记录手/
 - 方向移动在 core 模式是程序化的（骨盆扭转 + 倒放），IK 关时的“片段滑移”仍有 29–41% 速度，靠脚部锁定吃掉；视觉上腿的摆动方向与真实侧移片段不同。
 
 结果：core 与 extras 两种模式 94/94 @30/60/120 Hz（`tests/results/`）。
+
+## Round 3 — 原地转身 + 翻滚入口（2026-11-03）
+
+结果：core（`UAL_EXTRAS=0`）与 extras 两种模式 **96/96 @30/60/120 Hz**（`tests/results/`）。
+
+**原地转身（plant-and-turn）**：站定（根速度 <0.35 m/s）时身体偏航超过 `turn_step_yaw`=0.45 rad / `max_lock_yaw_stand`=1.2 rad，
+被锁定的脚走一次 settle 小步，而不是直接断开锁定；`max_lock_yaw` 断开只在移动时生效。改动前（基线）`anim_turn_inplace_180`
+在 30/120 Hz 各断开 1 次（FAIL）。
+
+| 用例 | 30 Hz | 60 Hz | 120 Hz |
+|---|---|---|---|
+| anim_turn_inplace_90 | PASS 断开 0，步数 2，终点偏差 0.009 m | PASS 0 / 2 / 0.010 m | PASS 0 / 2 / 0.011 m |
+| anim_turn_inplace_180 | PASS 0 / 2 / 0.042 m | PASS 0 / 2 / 0.020 m | PASS 0 / 2 / 0.021 m |
+
+**翻滚入口**（Round 2 遗留的“俯冲”）：根因是站立慢跑 → 翻滚片段 0.36 s 处（已倒立）的交叉淡化把姿态整个翻过来。
+改为从片段 0.12 s（下蹲伸手段）进入、淡化 0.10 s，并按离线采样的“最低接触点”表（手/头/上臂/脊柱/骨盆按体半径 + 脚底，带符号，±0.06 s 平滑）
+把模型下压/抬起，防止腾空与骨盆穿地。`ClipSampler` 现在对不存在的骨骼名直接断言（以前 `"head"` 返回 -1 会静默读到最后一根骨骼）。
+
+| 指标 | 修复前 | 30 Hz | 60 Hz | 120 Hz |
+|---|---|---|---|---|
+| 前半段最低接触点离地最大值 (m) | 0.27–0.31 | 0.127 | 0.124 | 0.127 |
+| 身体系头部速度最大值 (m/s) | ~52 | 13.3 | 18.2 | 18.9 |
+| 头部最低高度 (m) | 0.05–0.13 | 0.074 | 0.071 | 0.066 |
+| 骨盆最高 (m) | — | 0.69 | 0.85 | 0.90 |
+
+如实说明：骨盆最高仍 0.7–0.9 m，可视化里翻滚第一阶段仍像“鱼跃前滚”（身体水平、双腿离地约 0.5 m、手与头着地），不是贴地前滚。
+
+## Round 3 — 可视化验收（core 模式，llvmpipe 软件渲染，2026-11-03）
+
+命令（`UAL_EXTRAS=0`，日志确认 `anim_library=core`）：
+`DISPLAY=:17 godot --path . --rendering-driver opengl3 --fixed-fps 30 --resolution 1280x720 --write-movie showcase.avi -s res://tools/showcase.gd -- --shots=<dir>/shots`
+产出（不入库）：`/workspace/acceptance/round3/`：`showcase.mp4`（连续 49.1 s，1473 帧，无剪切——特写由共享世界的第二个 SubViewport 相机渲染），
+`front/side/back.png`、`shots/`（57 张）、`closeups/`（28 张）、`contact_sheet.png`。
+
+| 动作 | 结论 | 说明 |
+|---|---|---|
+| 站立 正/侧/背 | 通过 | 姿态自然，双脚着地 |
+| 走/慢跑/冲刺 | 通过 | 步幅与身体倾斜合理 |
+| 楼梯上行脚部 | 通过 | 前脚整脚踩在台阶面上，后脚脚尖在下一级台沿，无穿插 |
+| 楼梯下行脚部 | 未证实 | 特写拍到时已到底部平地，没有拍到下台阶的脚 |
+| 30° 坡道脚部 | 基本通过 | 支撑脚贴合坡面；视角近，画面边缘有裁切 |
+| 急转 90°/180° | 一般 | 90° 正常；180° 中途双腿交叉、膝内扣，观感别扭 |
+| 侧移 | 一般 | 程序化（core 无侧移片段）：其实是带骨盆扭转的跑步步态，没有交叉步 |
+| 后退 | 一般 | 倒放前进片段，可接受但能看出来 |
+| 原地转身 | 基本通过 | 转身中一只脚抬起小步，结束后双脚着地；180° 后站姿略内八 |
+| 跳跃落地 / 高处落下 | 通过 | 落地屈膝缓冲，脚着地 |
+| 滑铲 | 通过 | 坐地后仰、一肘撑地，可信 |
+| 翻滚 | 不通过（有改善） | 第一阶段是水平鱼跃，腿离地约 0.5 m、头手着地；中段团身背滚、后段蹲起正常 |
+| 翻越 0.9 m | 基本通过 | 手按墙顶、团身越过，落地正常；core 仍有约 0.16 m/帧的单帧跳变（视频可见） |
+| 攀上 1.5 m | 基本通过 | 挂臂 → 膝上台沿 → 迈步站起，手部接触正确；同样有单帧跳变 |
+
+所有观感结论只在 llvmpipe 上得出；动态手感仍需 M2 真机验收。
