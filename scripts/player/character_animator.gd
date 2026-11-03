@@ -1321,7 +1321,11 @@ func _sample_roll(m: Transform3D) -> void:
 	var bones := PackedStringArray(ROLL_RADIUS.keys())
 	for b in ClipSampler.SOLE:
 		bones.append(b)
-	var cs := ClipSampler.sample(skeleton, m, clip_library().get_animation("roll_tuck"), bones)
+	var clip := clip_library().get_animation("roll_tuck")
+	var cs := ClipSampler.sample(skeleton, m, clip, bones)
+	if not clip.has_meta("pelvis_capped") and OS.get_environment("ROLL_NOCAP") != "1":
+		clip.set_meta("pelvis_capped", _cap_roll_pelvis(clip, cs, m))
+		cs = ClipSampler.sample(skeleton, m, clip, bones)
 	_cs_roll = cs
 	var raw := PackedFloat32Array()
 	for i in ROLL_DROP_N + 1:
@@ -1349,6 +1353,216 @@ func _sample_roll(m: Transform3D) -> void:
 				vmax = maxf(vmax, v)
 			tt += 1.0 / 60.0
 		print("ROLL_CLIP window head_v_max (clip time) %.2f  x playback %.2f" % [vmax, (ROLL_T1 - ROLL_T0) / 0.6])
+
+
+## Pelvis cap (tucked back): while the trunk is pitched over (head not above
+## the pelvis) the source clip keeps the back straight, so the inverted body
+## stands on its head with the pelvis ~0.7 m up, which reads as a jump. A
+## real forward roll rounds the back and tucks the chin so the hips pass
+## over the shoulders low. Here a per-key spine/neck flexion (spine_01..03,
+## neck_01, Head: rotation about each bone's lateral axis) is solved so the
+## pelvis stays <= the cap above the lowest body contact: the clip is sampled
+## at a few uniform curl levels, each key takes the smallest level that meets
+## the cap (linear between levels), and that curve is smoothed (+-ROLL_CAP_SM s)
+## and rate-limited (ROLL_CAP_RATE deg/s of clip time) so nothing whips.
+## Returns the largest curl (deg, summed over the chain).
+const ROLL_PELVIS_CAP := 0.45
+const ROLL_CURL_BONES := {"spine_01": 0.2, "spine_02": 0.25, "spine_03": 0.25, "neck_01": 0.15, "Head": 0.15,
+	"upperarm_l": -ROLL_ARM_COMP, "upperarm_r": -ROLL_ARM_COMP}
+## the arms hang from spine_03: counter-rotate them so the curl rounds the
+## back without swinging the hands further down (hands-planted entry)
+const ROLL_ARM_COMP := 0.7
+const ROLL_CURL_LEVELS := [0.0, 15.0, 30.0, 45.0, 60.0, 75.0, 90.0]
+const ROLL_CAP_SM := 0.10
+const ROLL_CAP_RATE := 400.0
+
+
+func _roll_pelvis_h(cs: ClipSampler, t: float) -> float:
+	var low := cs.sole_min(t)
+	for b in ROLL_RADIUS:
+		low = minf(low, cs.at(b, t).y - ROLL_RADIUS[b])
+	return cs.at("pelvis", t).y - low
+
+
+func _apply_roll_curl(clip: Animation, orig: Dictionary, axes: Dictionary, curl_at: Callable) -> void:
+	for tr in orig:
+		var bn := str(clip.track_get_path(tr)).get_slice(":", 1)
+		var vals: Array = orig[tr]
+		for k in vals.size():
+			var c: float = curl_at.call(clip.track_get_key_time(tr, k))
+			clip.track_set_key_value(tr, k, ((vals[k] as Quaternion) * Quaternion(axes[bn], deg_to_rad(c * ROLL_CURL_BONES[bn]))).normalized())
+
+
+func _cap_roll_pelvis(clip: Animation, cs: ClipSampler, m: Transform3D) -> float:
+	var cap := float(OS.get_environment("ROLL_CAP")) if OS.has_environment("ROLL_CAP") else ROLL_PELVIS_CAP
+	var rate := float(OS.get_environment("ROLL_CAP_RATE")) if OS.has_environment("ROLL_CAP_RATE") else ROLL_CAP_RATE
+	var bones := PackedStringArray(ROLL_RADIUS.keys())
+	for b in ClipSampler.SOLE:
+		bones.append(b)
+	# lateral axis of each curl bone in its own local frame (rest pose)
+	var lat_sk := m.basis.inverse() * Vector3.RIGHT
+	var orig := {}
+	var axes := {}
+	for bn in ROLL_CURL_BONES:
+		var tr := clip.find_track(NodePath("Armature/Skeleton3D:" + bn), Animation.TYPE_ROTATION_3D)
+		if tr < 0:
+			continue
+		var vals := []
+		for k in clip.track_get_key_count(tr):
+			vals.append(clip.track_get_key_value(tr, k))
+		orig[tr] = vals
+		axes[bn] = (skeleton.get_bone_global_rest(skeleton.find_bone(bn)).basis.inverse() * lat_sk).normalized()
+	if orig.is_empty():
+		return 0.0
+	# sign of flexion: the one that lowers the pelvis at the worst frame
+	var sgn := 1.0
+	var probe := {}
+	for sv in [1.0, -1.0]:
+		_apply_roll_curl(clip, orig, axes, func(_t): return sv * 30.0)
+		probe[sv] = ClipSampler.sample(skeleton, m, clip, bones)
+	var gain := 0.0
+	var tt := ROLL_T0
+	while tt <= ROLL_T1:
+		gain += _roll_pelvis_h(probe[-1.0], tt) - _roll_pelvis_h(probe[1.0], tt)
+		tt += 1.0 / 30.0
+	sgn = 1.0 if gain > 0.0 else -1.0
+	var lv := []
+	for c in ROLL_CURL_LEVELS:
+		_apply_roll_curl(clip, orig, axes, func(_t): return sgn * c)
+		lv.append(ClipSampler.sample(skeleton, m, clip, bones))
+	# per-frame needed curl (60 Hz clip time)
+	var n := int(ceil(clip.length * 60.0)) + 1
+	var need := PackedFloat32Array()
+	need.resize(n)
+	for f in n:
+		var t := f / 60.0
+		if t < ROLL_T0 - 0.05 or t > ROLL_T1 or cs.at("Head", t).y - cs.at("pelvis", t).y >= 0.3:
+			continue
+		var h_prev := _roll_pelvis_h(lv[0], t)
+		if h_prev <= cap:
+			continue
+		var c_need: float = ROLL_CURL_LEVELS[-1]
+		for i in range(1, lv.size()):
+			var h := _roll_pelvis_h(lv[i], t)
+			if h <= cap:
+				var x := clampf((h_prev - cap) / maxf(h_prev - h, 0.001), 0.0, 1.0)
+				c_need = lerpf(ROLL_CURL_LEVELS[i - 1], ROLL_CURL_LEVELS[i], x)
+				break
+			h_prev = h
+		need[f] = c_need
+	# envelope-preserving smooth: moving max over +-SM, then triangular smooth
+	var env := PackedFloat32Array()
+	env.resize(n)
+	var w := int(ROLL_CAP_SM * 60.0)
+	for f in n:
+		var mx := 0.0
+		for j in range(maxi(f - w, 0), mini(f + w, n - 1) + 1):
+			mx = maxf(mx, need[j])
+		env[f] = mx
+	var curl := PackedFloat32Array()
+	curl.resize(n)
+	for f in n:
+		var acc := 0.0
+		var ws := 0.0
+		for j in range(maxi(f - w, 0), mini(f + w, n - 1) + 1):
+			var wj := 1.0 - absf(j - f) / float(w + 1)
+			acc += env[j] * wj
+			ws += wj
+		curl[f] = acc / ws
+	var lim := rate / 60.0
+	for f in range(1, n):
+		curl[f] = minf(curl[f], curl[f - 1] + lim)
+	for f in range(n - 2, -1, -1):
+		curl[f] = minf(curl[f], curl[f + 1] + lim)
+	var cmax := 0.0
+	for x in curl:
+		cmax = maxf(cmax, x)
+	_apply_roll_curl(clip, orig, axes, func(t: float) -> float:
+		var x := clampf(t * 60.0, 0.0, n - 1.0)
+		var i := mini(int(x), n - 2)
+		return sgn * lerpf(curl[i], curl[i + 1], x - i))
+	if OS.has_environment("ROLL_DEBUG"):
+		var out := []
+		for f in range(0, n, 2):
+			out.append(snappedf(curl[f], 1.0))
+		print("ROLL_CAP sgn=%d max=%.1f deg curl(30Hz)=%s" % [sgn, cmax, out])
+	if OS.get_environment("ROLL_NOPITCH") != "1":
+		_cap_roll_pitch(clip, ClipSampler.sample(skeleton, m, clip, bones), m, cap, bones)
+	return cmax
+
+
+## Second stage: whole-body pitch about the pelvis joint (pelvis rotation
+## track) for the frames the curl cannot fix (hands planted, hips high):
+## per pelvis key the signed pitch within +-ROLL_PITCH_STEP deg that best
+## meets the cap, smoothed and rate-limited, iterated ROLL_PITCH_PASSES times.
+const ROLL_PITCH_STEP := 40
+## pitch only after the entry crossfade (clip time past ROLL_T0)
+const ROLL_PITCH_SKIP := 0.12
+const ROLL_PITCH_PASSES := 4
+const ROLL_PITCH_RATE := 240.0
+
+
+func _roll_pitch_h(cs: ClipSampler, t: float, r: Quaternion) -> float:
+	var pel := cs.at("pelvis", t)
+	var low := INF
+	for b in ROLL_RADIUS:
+		low = minf(low, (pel + r * (cs.at(b, t) - pel)).y - ROLL_RADIUS[b])
+	for b in ClipSampler.SOLE:
+		low = minf(low, (pel + r * (cs.at(b, t) - pel)).y - ClipSampler.SOLE[b])
+	return pel.y - low
+
+
+func _cap_roll_pitch(clip: Animation, cs: ClipSampler, m: Transform3D, cap: float, bones: PackedStringArray) -> void:
+	var tr := clip.find_track(NodePath("Armature/Skeleton3D:pelvis"), Animation.TYPE_ROTATION_3D)
+	if tr < 0:
+		return
+	var pb := skeleton.find_bone("pelvis")
+	var par := skeleton.get_bone_parent(pb)
+	var qp := (m.basis * (skeleton.get_bone_global_rest(par).basis if par >= 0 else Basis.IDENTITY)).get_rotation_quaternion()
+	var rate := float(OS.get_environment("ROLL_PITCH_RATE")) if OS.has_environment("ROLL_PITCH_RATE") else ROLL_PITCH_RATE
+	var nk := clip.track_get_key_count(tr)
+	var orig: Array[Quaternion] = []
+	for k in nk:
+		orig.append(clip.track_get_key_value(tr, k))
+	var total := PackedFloat32Array()
+	total.resize(nk)
+	for pass_i in ROLL_PITCH_PASSES:
+		var d := PackedFloat32Array()
+		d.resize(nk)
+		for k in nk:
+			var t := clip.track_get_key_time(tr, k)
+			if t < ROLL_T0 + ROLL_PITCH_SKIP or t > ROLL_T1 or cs.at("Head", t).y - cs.at("pelvis", t).y >= 0.3:
+				continue
+			var h0 := _roll_pitch_h(cs, t, Quaternion.IDENTITY)
+			if h0 <= cap:
+				continue
+			var best := h0
+			for a in range(-ROLL_PITCH_STEP, ROLL_PITCH_STEP + 1, 2):
+				var h := _roll_pitch_h(cs, t, Quaternion(Vector3.RIGHT, deg_to_rad(a)))
+				if maxf(h, cap) + absf(a) * 0.0005 < maxf(best, cap) + absf(d[k]) * 0.0005:
+					best = h
+					d[k] = a
+		for k in nk:
+			var acc := 0.0
+			var wsum := 0.0
+			for j in nk:
+				var dt := absf(clip.track_get_key_time(tr, j) - clip.track_get_key_time(tr, k))
+				if dt < ROLL_CAP_SM:
+					var w := 1.0 - dt / ROLL_CAP_SM
+					acc += d[j] * w
+					wsum += w
+			total[k] += acc / wsum
+		for k in range(1, nk):
+			var lim := rate * (clip.track_get_key_time(tr, k) - clip.track_get_key_time(tr, k - 1))
+			total[k] = clampf(total[k], total[k - 1] - lim, total[k - 1] + lim)
+		for k in range(nk - 2, -1, -1):
+			var lim := rate * (clip.track_get_key_time(tr, k + 1) - clip.track_get_key_time(tr, k))
+			total[k] = clampf(total[k], total[k + 1] - lim, total[k + 1] + lim)
+		for k in nk:
+			clip.track_set_key_value(tr, k, (qp.inverse() * Quaternion(Vector3.RIGHT, deg_to_rad(total[k])) * qp * orig[k]).normalized())
+		cs = ClipSampler.sample(skeleton, m, clip, bones)
+	if OS.has_environment("ROLL_DEBUG"):
+		print("ROLL_PITCH deg=%s" % [Array(total).slice(0, 26).map(func(x): return snappedf(x, 1.0))])
 
 
 ## drop for roll progress u (0..1), faded in over the state crossfade

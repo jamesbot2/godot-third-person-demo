@@ -9,6 +9,9 @@ extends RefCounted
 ## shoulder roll, so the knees stay tucked to the chest; the clip's upper body
 ## (hand plant, chin tuck, shoulder roll) and its stand-up are kept.
 ## Result is a new in-memory Animation "roll_tuck"; nothing is written to disk.
+## CharacterAnimator._cap_roll_pelvis then rounds the back (spine/neck curl,
+## arms counter-rotated) and pitches the pelvis key-by-key so the pelvis
+## stays low over the shoulders (needs the skeleton, so it runs there).
 
 const LEG_BONES := ["thigh_l", "calf_l", "foot_l", "ball_l", "thigh_r", "calf_r", "foot_r", "ball_r"]
 ## clip time of the reference deep crouch (feet down, knees folded)
