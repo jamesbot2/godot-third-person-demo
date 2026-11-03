@@ -58,8 +58,9 @@ Round 3 前期（提交 `9e0060c`）把 Drawcall Market（https://market.drawcal
   `assets/animations/local/ual_extra.res`。存在该文件时动画器自动启用 “extras” 模式（真实翻越/攀上台沿片段），否则用
   “core” 模式（只用 Standard 片段，程序化翻越/攀爬）。`UAL_EXTRAS=0` 强制 core 模式。两种模式都跑满 86 个测试。
 - 删除了 `assets/licenses/Quaternius_UAL2_Source_via_Drawcall.txt`（它把片段错误地描述为全部 UAL2、并断言可再分发）。
-- **未处理的历史问题**：已推送的提交 `9e0060c` 中的 `ual_clips.res` 仍包含这些片段的烘焙数据。改写已推送的历史（force-push）
-  需要仓库所有者确认，本轮没有做。若需要彻底移除，可在确认后对 `dev/movement-system` 做历史改写，或在合并前 squash。
+- **历史问题与处理决定（仓库所有者，2026-11-03）**：已推送的提交 `9e0060c` 中的 `ual_clips.res` 仍包含这些片段的烘焙数据。
+  **不改写历史**；PR #1 **必须以 squash merge 方式合并**——squash 后进入 `main` 的只有分支最终状态（不含这些烘焙数据），
+  `9e0060c` 不会出现在 `main` 的历史里。**不要用普通 merge 或 rebase merge 合并 PR #1。**
 - 如需正式使用这些片段：直接向 Quaternius 购买 Source/Pro 包，并按购买时附带的许可证决定能否把烘焙结果放进公开仓库。
 
 Standard 包（UBC、UAL1 Standard、UAL2 Standard）的结论不变：CC0，直接从作者的 itch.io 页面以 $0 获得。
