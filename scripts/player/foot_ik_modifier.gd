@@ -78,6 +78,10 @@ var _root_v := 0.0
 ## only near-break stances are released this way; normal stances end on height
 var swing_min_offset := 0.18
 var swing_hold: Array[bool] = [false, false]
+## scale of the swing-release lift arc (the animator lowers it while
+## backpedalling: the clip already lifts the foot behind the body, and an extra
+## arc at toe-off, with the foot still in FRONT, threw the knee forward)
+var swing_arc_scale := 1.0
 ## procedural step arc: a foot that is released while still on the ground
 ## (swing release, settle step, lock break) is lifted in proportion to the
 ## distance it still has to travel, so it never skates flat across the floor
@@ -261,7 +265,7 @@ func _process_modification() -> void:
 		var lift := 0.0
 		var lift_t := 0.0
 		if swing_hold[i]:
-			lift_t = minf(0.07, Vector2(ow.x, ow.z).length() * 0.6 + 0.03 * _clip_v[i])
+			lift_t = minf(0.07, Vector2(ow.x, ow.z).length() * 0.6 + 0.03 * _clip_v[i]) * swing_arc_scale
 		elif cooldown[i]:
 			lift_t = minf(0.05, Vector2(ow.x, ow.z).length() * 0.4)
 		_lift[i] = lerpf(_lift[i], lift_t, 1.0 - exp(-30.0 * dt))

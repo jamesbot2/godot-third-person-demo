@@ -1407,19 +1407,25 @@ func t_anim() -> void:
 						od += sw_t[i] - sw_t[i - 1]
 						no += 1
 				res["asym"] = absf(ev / maxi(ne, 1) - od / maxi(no, 1)) / maxf(0.5 * (ev / maxi(ne, 1) + od / maxi(no, 1)), 1e-3) if ne > 0 and no > 0 else -1.0
+				# cadence (steps per minute) from the mean touchdown interval
+				res["cadence"] = 60.0 * (sw_t.size() - 1) / maxf(sw_t[-1] - sw_t[0], 1e-3) if sw_t.size() > 2 else -1.0
 		_anim.foot_ik_enabled = true
 		metric("anim_%s_clip_slip_med" % spec[0], res["fk_med"])
 		metric("anim_%s_slip_med" % spec[0], res["ik_med"])
 		metric("anim_%s_lock_pops" % spec[0], res["pops"])
 		metric("anim_%s_leg_err_deg" % spec[0], res["leg"])
 		metric("anim_%s_swing_knee_lead_m" % spec[0], res["knee_lead"])
+		if res.has("cadence"):
+			metric("anim_%s_cadence_spm" % spec[0], res["cadence"])
 		if spec[0] == "backpedal":
 			# authored backward gait (BackwardGait): damped reversed knee drive.
 			# The plain reversed forward clip measures 0.36 m here (BWD_RAW=1);
 			# the authored clip 0.29-0.31 m; the round 6 re-posed aim_bwd
-			# (shorter steps, late low lift) 0.32-0.33 m. Modest gate: it catches a
-			# regression to the raw clip, not a full redesign.
-			check("anim_backpedal_gait", res["knee_lead"] < 0.33, "max swing knee lead ahead of hips=%.2f m (raw reversed forward clip 0.36)" % res["knee_lead"])
+			# (shorter steps, late low lift) 0.32-0.33 m. Round 7: most of that
+			# was FootIK's swing-release arc lifting the toe-off foot while it
+			# was still in FRONT of the hips (IK-off clip: ~0.14 m); the arc is
+			# scaled down while backpedalling -> ~0.25 m. Gate 0.30 m.
+			check("anim_backpedal_gait", res["knee_lead"] < 0.30, "max swing knee lead ahead of hips=%.2f m (raw reversed forward clip 0.36)" % res["knee_lead"])
 		var aim_set: bool = _anim.has_aim_set
 		var authored: bool = aim_set and spec[0] in ["aim_fwd", "strafe_left", "strafe_right", "backpedal", "diag_fl", "diag_br"]
 		var is_strafe: bool = spec[0] in ["strafe_left", "strafe_right"]

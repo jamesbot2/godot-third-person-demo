@@ -103,8 +103,8 @@ const LEN_CWALK := 2.0
 @export var diag_back_stride := 1.5
 ## aimed backpedal stride vs the forward-gait table stride at its speed
 ## (round 6: shorter, quicker backward steps; the re-posed aim_bwd sweeps
-## exactly this stride)
-@export var backpedal_stride_scale := 0.7
+## exactly this stride; round 7: 0.7 -> 0.85, cadence 177 -> ~147 steps/min)
+@export var backpedal_stride_scale := 0.85
 @export var backward_enter_deg := 115.0
 @export var backward_exit_deg := 95.0
 
@@ -184,6 +184,7 @@ var _aim_phase := 0.0   # shared normalized phase of the aim clips
 var _aim_bp := Vector2(0, 1)   # smoothed blend position
 var _aim_stride_f := 2.0   # stride/cycle of aim_fwd, aim_bwd (m)
 var _aim_stride_b := 2.0
+const BWD_ARC := 0.4
 var has_aim_set := false
 var _land_t := 99.0
 var _land_peak := 0.0
@@ -1721,6 +1722,9 @@ func _drive_procedural(dt: float, st: String) -> void:
 	# a pinned ball normally leaves via FootIK's swing release (clip ball
 	# speed / toe-off height); 0.24 m is only the hard safety break
 	foot_ik.max_lock_offset = 0.24
+	# backpedal: the clip lifts the foot itself; no extra toe-off arc
+	var bwd_w := _aim_s * clampf(-_aim_bp.y * 2.0, 0.0, 1.0)
+	foot_ik.swing_arc_scale = lerpf(1.0, BWD_ARC, bwd_w)
 	foot_ik.dt = dt
 	foot_ik.active = _foot_w > 0.0
 	_drop_s = lerpf(_drop_s, drop_t, 1.0 - exp(-10.0 * dt))
